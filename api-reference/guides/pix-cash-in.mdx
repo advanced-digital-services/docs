@@ -1,0 +1,904 @@
+---
+title: 'PIX Cash-In (Recebimento)'
+description: 'Como gerar cobranças PIX e receber pagamentos'
+---
+
+## Visão Geral
+
+O endpoint **PIX Cash-In** permite que você gere cobranças PIX dinâmicas para receber pagamentos. Cada cobrança gera um QR Code único e um código PIX (Pix Copia e Cola) que seus clientes podem usar para efetuar o pagamento.
+
+<Info>
+  Este endpoint requer um token Bearer válido. Verifique a [documentação de autenticação](/api-reference/guides/authentication) para mais detalhes.
+</Info>
+
+## Características
+
+- Geração de QR Code dinâmico
+- Código PIX no formato EMV (Copia e Cola)
+- Configuração de prazo de expiração (5 minutos a 7 dias)
+- Identificação única por `externalId`
+- Informações adicionais personalizáveis
+- Validação automática de CPF/CNPJ
+- **Split de pagamento**: divisão automática entre múltiplos destinatários
+
+## Endpoint
+
+### POST /api/pix/cash-in
+
+Gera uma nova cobrança PIX.
+
+#### Headers Obrigatórios
+
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+#### Request Body
+
+```json
+{
+  "transaction": {
+    "value": 150.00,
+    "description": "Pagamento de pedido #12345",
+    "expirationTime": 86400,
+    "externalId": "ORDER-12345-20240119",
+    "generateQrCode": true
+  },
+  "payer": {
+    "fullName": "Carlos Oliveira",
+    "document": "12345678901"
+  },
+  "additionalInfo": {
+    "orderId": "12345",
+    "storeName": "Tech Solutions",
+    "productCategory": "Eletrônicos"
+  },
+  "splits": [
+    {
+      "pixKey": "fornecedor@email.com",
+      "pixKeyType": "EMAIL",
+      "name": "Fornecedor Ltda",
+      "document": "12345678000199",
+      "type": "PERCENTAGE",
+      "value": 10,
+      "immediate": false
+    }
+  ]
+}
+```
+
+#### Request
+
+```bash
+curl -X POST https://api.avista.global/api/pix/cash-in \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "transaction": {
+      "value": 150.00,
+      "description": "Pagamento de pedido #12345",
+      "expirationTime": 86400,
+      "externalId": "ORDER-12345-20240119",
+      "generateQrCode": true
+    },
+    "payer": {
+      "fullName": "Carlos Oliveira",
+      "document": "12345678901"
+    },
+    "additionalInfo": {
+      "orderId": "12345"
+    },
+    "splits": [
+      {
+        "pixKey": "fornecedor@email.com",
+        "pixKeyType": "EMAIL",
+        "name": "Fornecedor Ltda",
+        "document": "12345678000199",
+        "type": "PERCENTAGE",
+        "value": 70,
+        "immediate": false
+      }
+    ]
+  }'
+```
+
+<Note>
+  O campo `splits` é opcional. Veja o [guia de Split de Pagamentos](/api-reference/guides/pix-split) para detalhes completos sobre tipos, formatos de valor e frequências.
+</Note>
+
+#### Response (201 Created)
+
+```json
+{
+  "transactionId": "7845",
+  "correlationId": "550e8400-e29b-41d4-a716-446655440000",
+  "externalId": "ORDER-12345-20240119",
+  "status": "PENDING",
+  "pixCode": "00020126580014br.gov.bcb.pix0136550e8400-e29b-41d4-a716-4466554400005204000053039865802BR5916Tech Solutions Ltda6009SAO PAULO62070503***63041D3D",
+  "generateTime": "2024-01-19T14:30:00.000Z",
+  "expirationDate": "2024-01-20T14:30:00.000Z",
+  "qrCodeImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAEsCAYAAAB5fY51..."
+}
+```
+
+<Note>
+  O campo `qrCodeImage` é retornado apenas quando `generateQrCode: true` é enviado na requisição. O valor é uma imagem PNG do QR Code codificada em Base64 no formato Data URL.
+</Note>
+
+## Parâmetros da Requisição
+
+### Transaction Object
+
+<ParamField path="transaction.value" type="number" required>
+  Valor da transação em reais (BRL). Deve ter no máximo 2 casas decimais.
+
+  **Mínimo:** `0.01`
+
+  **Exemplo:** `150.00`
+</ParamField>
+
+<ParamField path="transaction.description" type="string" required>
+  Descrição da transação que aparecerá no extrato do pagador.
+
+  **Máximo:** 140 caracteres
+
+  **Exemplo:** `"Pagamento de pedido #12345"`
+</ParamField>
+
+<ParamField path="transaction.expirationTime" type="number">
+  Tempo de expiração em segundos.
+
+  **Mínimo:** `300` (5 minutos)
+
+  **Máximo:** `604800` (7 dias)
+
+  **Padrão:** `86400` (24 horas)
+</ParamField>
+
+<ParamField path="transaction.externalId" type="string" required>
+  Identificador único externo da transação. Use para correlacionar com seu sistema.
+
+  **Máximo:** 255 caracteres
+
+  **Recomendação:** Use um formato que inclua data/hora para garantir unicidade
+
+  **Exemplo:** `"ORDER-12345-20240119-143000"`
+</ParamField>
+
+<ParamField path="transaction.generateQrCode" type="boolean">
+  Define se deve gerar o QR Code em Base64.
+
+  **Padrão:** `false`
+
+  **Recomendação:** Use `true` para exibir QR Code ao usuário
+</ParamField>
+
+### Payer Object
+
+<ParamField path="payer.fullName" type="string" required>
+  Nome completo do pagador.
+
+  **Exemplo:** `"Carlos Oliveira"`
+</ParamField>
+
+<ParamField path="payer.document" type="string" required>
+  CPF ou CNPJ do pagador (apenas números).
+
+  **CPF:** 11 dígitos
+
+  **CNPJ:** 14 dígitos
+
+  **Exemplo:** `"12345678901"` ou `"12345678000199"`
+</ParamField>
+
+### Additional Info Object
+
+<ParamField path="additionalInfo" type="object">
+  Informações adicionais em formato chave-valor (string:string).
+
+  **Máximo:** 10 chaves
+
+  **Exemplo:**
+  ```json
+  {
+    "orderId": "12345",
+    "customerId": "67890",
+    "storeName": "Tech Solutions"
+  }
+  ```
+</ParamField>
+
+### Splits Array (Opcional)
+
+<ParamField path="splits" type="array">
+  Lista de destinatários para divisão automática do pagamento recebido. Quando o PIX-IN é confirmado, o valor é dividido e enviado automaticamente aos destinatários.
+
+  **Máximo:** 10 destinatários por transação
+</ParamField>
+
+<ParamField path="splits[].pixKey" type="string" required>
+  Chave PIX do destinatário do split.
+
+  **Máximo:** 255 caracteres
+
+  **Exemplo:** `"fornecedor@email.com"`
+</ParamField>
+
+<ParamField path="splits[].pixKeyType" type="string" required>
+  Tipo da chave PIX do destinatário.
+
+  **Valores possíveis:** `EMAIL`, `PHONE`, `CPF`, `CNPJ`, `RANDOM`
+
+  **Exemplo:** `"EMAIL"`
+</ParamField>
+
+<ParamField path="splits[].name" type="string" required>
+  Nome completo do destinatário.
+
+  **Máximo:** 255 caracteres
+
+  **Exemplo:** `"Fornecedor Ltda"`
+</ParamField>
+
+<ParamField path="splits[].document" type="string" required>
+  CPF ou CNPJ do destinatário (apenas dígitos).
+
+  **CPF:** 11 dígitos | **CNPJ:** 14 dígitos
+
+  **Exemplo:** `"12345678000199"`
+</ParamField>
+
+<ParamField path="splits[].type" type="string" required>
+  Tipo do split: valor fixo ou percentual.
+
+  **Valores possíveis:**
+  - `FIXED` — Valor fixo em reais (ex: `10.00` = R$ 10,00)
+  - `PERCENTAGE` — Percentual direto (ex: `10` = 10%)
+
+  **Exemplo:** `"PERCENTAGE"`
+</ParamField>
+
+<ParamField path="splits[].value" type="number" required>
+  Valor do split conforme o tipo:
+  - **FIXED:** Valor em reais com até 2 casas decimais. `10.50` = R$ 10,50
+  - **PERCENTAGE:** Percentual direto. `10` = 10%, `25.5` = 25,5%
+
+  **Mínimo:** `0.01`
+
+  **Exemplo:** `10` (10% para PERCENTAGE) ou `10.00` (R$ 10,00 para FIXED)
+</ParamField>
+
+<ParamField path="splits[].immediate" type="boolean">
+  Se `true`, o split é executado imediatamente após a confirmação do PIX-IN, ignorando a frequência configurada na conta.
+
+  **Padrão:** `false`
+</ParamField>
+
+<Warning>
+  A soma dos splits (valores fixos + percentuais sobre o valor bruto) mais as taxas não pode exceder o valor da transação. Caso exceda, a API retornará erro `400`.
+</Warning>
+
+## Estrutura da Resposta
+
+<ResponseField name="transactionId" type="string" required>
+  ID interno da transação gerada pela Avista.
+
+  **Exemplo:** `"7845"`
+</ResponseField>
+
+<ResponseField name="correlationId" type="string" required>
+  UUID para rastreamento e correlação da transação.
+
+  **Exemplo:** `"550e8400-e29b-41d4-a716-446655440000"`
+</ResponseField>
+
+<ResponseField name="externalId" type="string" required>
+  ID externo fornecido na requisição (mesmo valor do input).
+
+  **Exemplo:** `"ORDER-12345-20240119"`
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Status atual da transação.
+
+  **Valores possíveis:**
+  - `PENDING`: Aguardando pagamento
+  - `CONFIRMED`: Pagamento confirmado
+  - `ERROR`: Erro no processamento
+
+  **Exemplo:** `"PENDING"`
+</ResponseField>
+
+<ResponseField name="pixCode" type="string" required>
+  Código PIX no formato EMV (Pix Copia e Cola).
+
+  **Exemplo:** `"00020126580014br.gov.bcb.pix..."`
+</ResponseField>
+
+<ResponseField name="generateTime" type="string" required>
+  Data e hora de geração da cobrança (ISO 8601 UTC).
+
+  **Exemplo:** `"2024-01-19T14:30:00.000Z"`
+</ResponseField>
+
+<ResponseField name="expirationDate" type="string" required>
+  Data e hora de expiração da cobrança (ISO 8601 UTC).
+
+  **Exemplo:** `"2024-01-20T14:30:00.000Z"`
+</ResponseField>
+
+<ResponseField name="qrCodeImage" type="string">
+  QR Code em Base64 no formato Data URL. Retornado apenas quando `generateQrCode: true` na requisição.
+
+  **Formato:** `data:image/png;base64,{base64_encoded_image}`
+
+  **Exemplo:** `"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAEsCAYAAAB5fY51..."`
+
+  **Uso:** Pode ser exibido diretamente em uma tag `<img>` no HTML ou decodificado para salvar como arquivo.
+</ResponseField>
+
+## Exemplos de Implementação
+
+### Node.js / TypeScript
+
+```typescript
+import axios from 'axios';
+
+interface CashInRequest {
+  transaction: {
+    value: number;
+    description: string;
+    expirationTime?: number;
+    externalId: string;
+    generateQrCode?: boolean;
+  };
+  payer: {
+    fullName: string;
+    document: string;
+  };
+  additionalInfo?: Record<string, string>;
+}
+
+interface CashInResponse {
+  transactionId: string;
+  correlationId: string;
+  externalId: string;
+  status: 'PENDING' | 'CONFIRMED' | 'ERROR';
+  pixCode: string;
+  generateTime: string;
+  expirationDate: string;
+  qrCodeImage?: string; // Presente apenas quando generateQrCode: true
+}
+
+async function createPixCharge(
+  token: string,
+  orderId: string,
+  amount: number,
+  customerName: string,
+  customerDocument: string
+): Promise<CashInResponse> {
+  const payload: CashInRequest = {
+    transaction: {
+      value: amount,
+      description: `Pagamento do pedido ${orderId}`,
+      expirationTime: 3600, // 1 hora
+      externalId: `ORDER-${orderId}-${Date.now()}`,
+      generateQrCode: true
+    },
+    payer: {
+      fullName: customerName,
+      document: customerDocument
+    },
+    additionalInfo: {
+      orderId: orderId,
+      timestamp: new Date().toISOString()
+    }
+  };
+
+  try {
+    const response = await axios.post<CashInResponse>(
+      'https://api.avista.global/api/pix/cash-in',
+      payload,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    console.log('Cobrança PIX gerada com sucesso!');
+    console.log(`ID da Transação: ${response.data.transactionId}`);
+    console.log(`Código PIX: ${response.data.pixCode}`);
+    console.log(`Expira em: ${new Date(response.data.expirationDate).toLocaleString('pt-BR')}`);
+    if (response.data.qrCodeImage) {
+      console.log('QR Code Image disponível para exibição');
+    }
+
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      console.error('Erro ao gerar cobrança:', error.response?.data);
+      throw new Error(error.response?.data?.message || 'Erro ao gerar cobrança PIX');
+    }
+    throw error;
+  }
+}
+
+// Uso
+const token = 'seu_token_aqui';
+createPixCharge(token, '12345', 150.00, 'Carlos Oliveira', '12345678901');
+```
+
+### Python
+
+```python
+import requests
+from datetime import datetime, timedelta
+from typing import Dict, Optional
+
+def create_pix_charge(
+    token: str,
+    order_id: str,
+    amount: float,
+    customer_name: str,
+    customer_document: str,
+    expiration_hours: int = 1,
+    additional_info: Optional[Dict[str, str]] = None
+) -> Dict:
+    """
+    Gera uma cobrança PIX
+
+    Args:
+        token: Token Bearer válido
+        order_id: ID do pedido
+        amount: Valor em reais
+        customer_name: Nome do cliente
+        customer_document: CPF ou CNPJ (apenas números)
+        expiration_hours: Horas até expiração (padrão: 1)
+        additional_info: Informações adicionais
+
+    Returns:
+        Dados da cobrança gerada
+    """
+    url = 'https://api.avista.global/api/pix/cash-in'
+
+    payload = {
+        'transaction': {
+            'value': round(amount, 2),
+            'description': f'Pagamento do pedido {order_id}',
+            'expirationTime': expiration_hours * 3600,
+            'externalId': f'ORDER-{order_id}-{int(datetime.now().timestamp())}',
+            'generateQrCode': True
+        },
+        'payer': {
+            'fullName': customer_name,
+            'document': customer_document
+        },
+        'additionalInfo': additional_info or {}
+    }
+
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+
+        data = response.json()
+
+        print('Cobrança PIX gerada com sucesso!')
+        print(f"ID da Transação: {data['transactionId']}")
+        print(f"Código PIX: {data['pixCode']}")
+        print(f"Status: {data['status']}")
+
+        expiration = datetime.fromisoformat(data['expirationDate'].replace('Z', '+00:00'))
+        print(f"Expira em: {expiration.strftime('%d/%m/%Y %H:%M:%S')}")
+
+        if 'qrCodeImage' in data:
+            print('QR Code Image disponível para exibição')
+
+        return data
+
+    except requests.exceptions.RequestException as e:
+        print(f'Erro ao gerar cobrança: {e}')
+        if hasattr(e.response, 'json'):
+            print(f'Detalhes: {e.response.json()}')
+        raise
+
+# Uso
+token = 'seu_token_aqui'
+charge = create_pix_charge(
+    token=token,
+    order_id='12345',
+    amount=150.00,
+    customer_name='Carlos Oliveira',
+    customer_document='12345678901',
+    expiration_hours=24,
+    additional_info={
+        'storeName': 'Tech Solutions',
+        'productCategory': 'Eletrônicos'
+    }
+)
+```
+
+### PHP
+
+```php
+<?php
+
+function createPixCharge(
+    string $token,
+    string $orderId,
+    float $amount,
+    string $customerName,
+    string $customerDocument,
+    int $expirationHours = 1
+): array {
+    $url = 'https://api.avista.global/api/pix/cash-in';
+
+    $payload = [
+        'transaction' => [
+            'value' => round($amount, 2),
+            'description' => "Pagamento do pedido $orderId",
+            'expirationTime' => $expirationHours * 3600,
+            'externalId' => "ORDER-$orderId-" . time(),
+            'generateQrCode' => true
+        ],
+        'payer' => [
+            'fullName' => $customerName,
+            'document' => $customerDocument
+        ],
+        'additionalInfo' => [
+            'orderId' => $orderId
+        ]
+    ];
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Authorization: Bearer ' . $token,
+        'Content-Type: application/json'
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode !== 201) {
+        throw new Exception("Erro ao gerar cobrança: HTTP $httpCode - $response");
+    }
+
+    $data = json_decode($response, true);
+
+    echo "Cobrança PIX gerada com sucesso!" . PHP_EOL;
+    echo "ID da Transação: {$data['transactionId']}" . PHP_EOL;
+    echo "Código PIX: {$data['pixCode']}" . PHP_EOL;
+    echo "Status: {$data['status']}" . PHP_EOL;
+    if (isset($data['qrCodeImage'])) {
+        echo "QR Code Image disponível para exibição" . PHP_EOL;
+    }
+
+    return $data;
+}
+
+// Uso
+$token = 'seu_token_aqui';
+$charge = createPixCharge(
+    $token,
+    '12345',
+    150.00,
+    'Carlos Oliveira',
+    '12345678901',
+    24
+);
+```
+
+## Casos de Uso
+
+### 1. E-commerce - Checkout com PIX
+
+```javascript
+// Integração em checkout de e-commerce
+class PixCheckout {
+  constructor(token) {
+    this.token = token;
+  }
+
+  async generatePayment(order) {
+    const charge = await createPixCharge(
+      this.token,
+      order.id,
+      order.total,
+      order.customer.name,
+      order.customer.document
+    );
+
+    // Exibir QR Code na página (usando imagem da API ou gerando localmente)
+    this.displayQrCode(charge);
+
+    // Iniciar polling para verificar pagamento
+    this.startPaymentPolling(charge.transactionId);
+
+    return charge;
+  }
+
+  displayQrCode(charge) {
+    const qrCanvas = document.getElementById('qr-canvas');
+    const qrImage = document.getElementById('qr-image');
+
+    // Usar imagem Base64 da API (preferível - evita processamento no cliente)
+    if (charge.qrCodeImage) {
+      qrImage.src = charge.qrCodeImage;
+      qrImage.style.display = 'block';
+      qrCanvas.style.display = 'none';
+    } else {
+      // Fallback: gerar QR Code localmente usando biblioteca (ex: qrcode.js)
+      QRCode.toCanvas(qrCanvas, charge.pixCode, {
+        width: 300,
+        margin: 2
+      });
+      qrCanvas.style.display = 'block';
+      qrImage.style.display = 'none';
+    }
+
+    // Mostrar também o código Pix Copia e Cola
+    document.getElementById('pix-code').textContent = charge.pixCode;
+  }
+
+  startPaymentPolling(transactionId) {
+    // Verificar status a cada 3 segundos
+    const interval = setInterval(async () => {
+      const status = await this.checkPaymentStatus(transactionId);
+
+      if (status === 'CONFIRMED') {
+        clearInterval(interval);
+        this.onPaymentConfirmed();
+      }
+    }, 3000);
+
+    // Parar após 10 minutos
+    setTimeout(() => clearInterval(interval), 10 * 60 * 1000);
+  }
+
+  onPaymentConfirmed() {
+    // Redirecionar para página de sucesso
+    window.location.href = '/payment/success';
+  }
+}
+```
+
+### 2. PDV (Ponto de Venda)
+
+```python
+class PixPDV:
+    """Sistema de PDV com cobrança PIX"""
+
+    def __init__(self, token: str):
+        self.token = token
+
+    def process_sale(self, items: list, customer: dict) -> dict:
+        """Processar venda e gerar cobrança PIX"""
+
+        # Calcular total
+        total = sum(item['price'] * item['quantity'] for item in items)
+
+        # Gerar descrição
+        description = self.generate_sale_description(items)
+
+        # Criar cobrança PIX (expira em 15 minutos)
+        charge = create_pix_charge(
+            token=self.token,
+            order_id=self.generate_sale_id(),
+            amount=total,
+            customer_name=customer['name'],
+            customer_document=customer['document'],
+            expiration_hours=0.25,  # 15 minutos
+            additional_info={
+                'items_count': str(len(items)),
+                'cashier_id': self.get_cashier_id()
+            }
+        )
+
+        # Imprimir comprovante com QR Code
+        self.print_receipt(charge, items, total)
+
+        return charge
+
+    def generate_sale_description(self, items: list) -> str:
+        """Gerar descrição resumida da venda"""
+        if len(items) == 1:
+            return f"{items[0]['name']}"
+        else:
+            return f"{len(items)} itens - {items[0]['name']} e mais"
+
+    def print_receipt(self, charge: dict, items: list, total: float):
+        """Imprimir comprovante com QR Code"""
+        # Implementar impressão térmica ou gerar PDF
+        print("\n" + "="*50)
+        print("COMPROVANTE DE COBRANÇA PIX")
+        print("="*50)
+        for item in items:
+            print(f"{item['name']}: R$ {item['price']:.2f}")
+        print("-"*50)
+        print(f"TOTAL: R$ {total:.2f}")
+        print(f"\nID da Transação: {charge['transactionId']}")
+        print(f"Código PIX:\n{charge['pixCode']}")
+        print("="*50 + "\n")
+```
+
+### 3. SaaS - Cobrança de Assinatura
+
+```typescript
+class SubscriptionBilling {
+  constructor(private token: string) {}
+
+  async chargeMonthlySubscription(
+    subscriptionId: string,
+    userId: string,
+    planValue: number
+  ) {
+    // Buscar dados do usuário
+    const user = await this.getUserData(userId);
+
+    // Gerar cobrança com expiração de 3 dias
+    const charge = await createPixCharge(
+      this.token,
+      `SUB-${subscriptionId}-${new Date().getMonth() + 1}`,
+      planValue,
+      user.name,
+      user.document
+    );
+
+    // Enviar email com link de pagamento
+    await this.sendPaymentEmail(user.email, charge);
+
+    // Agendar lembrete 1 dia antes de expirar
+    await this.scheduleReminder(user, charge, 24);
+
+    return charge;
+  }
+
+  async sendPaymentEmail(email: string, charge: CashInResponse) {
+    // Implementar envio de email
+    const paymentLink = `https://app.exemplo.com/payment/${charge.transactionId}`;
+
+    await sendEmail({
+      to: email,
+      subject: 'Fatura disponível - Pague com PIX',
+      html: `
+        <h2>Sua fatura está disponível</h2>
+        <p>Valor: R$ ${charge.value}</p>
+        <p>Vencimento: ${new Date(charge.expirationDate).toLocaleDateString('pt-BR')}</p>
+        <p><a href="${paymentLink}">Clique aqui para pagar com PIX</a></p>
+      `
+    });
+  }
+}
+```
+
+## Monitoramento de Pagamentos
+
+Para ser notificado quando um pagamento for confirmado, você pode:
+
+<Tabs>
+  <Tab title="Webhooks (Recomendado)">
+    Configure webhooks para receber notificações automáticas quando o status mudar.
+
+    ```javascript
+    // Endpoint webhook em seu servidor
+    app.post('/webhooks/pix', (req, res) => {
+      const { transactionId, status, externalId } = req.body;
+
+      if (status === 'CONFIRMED') {
+        // Processar pagamento confirmado
+        processPaymentConfirmation(externalId);
+      }
+
+      res.sendStatus(200);
+    });
+    ```
+  </Tab>
+
+  <Tab title="Polling">
+    Consulte periodicamente o status da transação.
+
+    ```javascript
+    async function monitorPayment(transactionId, maxAttempts = 200) {
+      for (let i = 0; i < maxAttempts; i++) {
+        const status = await checkTransactionStatus(transactionId);
+
+        if (status === 'CONFIRMED') {
+          return true;
+        }
+
+        // Aguardar 3 segundos antes de tentar novamente
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+
+      return false; // Timeout
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Códigos de Resposta
+
+| Código | Descrição | Significado |
+|--------|-----------|-------------|
+| `201` | Cobrança Criada | Cobrança PIX gerada com sucesso |
+| `400` | Dados Inválidos | Verifique os campos obrigatórios e formatos |
+| `401` | Token Inválido | Token não fornecido, expirado ou inválido |
+
+<Info>
+  Consulte a [Referência da API](/api-reference/endpoints/pix-cash-in) para detalhes completos dos campos de resposta.
+</Info>
+
+## Boas Práticas
+
+<AccordionGroup>
+  <Accordion title="Use externalId único e rastreável">
+    Inclua informações que facilitem a identificação: `ORDER-{orderId}-{timestamp}` ou `INV-{invoiceId}-{date}`
+  </Accordion>
+
+  <Accordion title="Configure expiração apropriada">
+    - **E-commerce:** 15-30 minutos
+    - **Boletos/Faturas:** 3-7 dias
+    - **PDV:** 5-15 minutos
+  </Accordion>
+
+  <Accordion title="Valide CPF/CNPJ antes de enviar">
+    Implemente validação local para evitar erros 400.
+
+    ```javascript
+    function isValidCPF(cpf: string): boolean {
+      cpf = cpf.replace(/\D/g, '');
+      if (cpf.length !== 11) return false;
+      // Adicionar lógica de validação de CPF
+      return true;
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Trate valores com precisão">
+    Use bibliotecas de precisão decimal para evitar erros de arredondamento.
+
+    ```javascript
+    import Decimal from 'decimal.js';
+
+    const total = new Decimal(price).times(quantity).toNumber();
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Observações Importantes
+
+<Warning>
+  Cobranças expiradas não podem ser reativadas. Gere uma nova cobrança se necessário.
+</Warning>
+
+- **Valor mínimo:** R$ 0,01
+- **Expiração mínima:** 5 minutos (300 segundos)
+- **Expiração máxima:** 7 dias (604800 segundos)
+
+## Próximos Passos
+
+<CardGroup cols={2}>
+  <Card title="Split de Pagamentos" icon="code-fork" href="/api-reference/guides/pix-split">
+    Divida pagamentos automaticamente entre destinatários
+  </Card>
+  <Card title="Estornar Pagamento" icon="rotate-left" href="/api-reference/guides/pix-refund-in">
+    Aprenda a estornar pagamentos recebidos
+  </Card>
+  <Card title="Realizar Pagamento" icon="money-bill-transfer" href="/api-reference/guides/pix-cash-out">
+    Envie pagamentos PIX
+  </Card>
+  <Card title="Pagar via QR Code" icon="qrcode" href="/api-reference/guides/pix-cash-out-qrcode">
+    Realize pagamentos via QR Code PIX
+  </Card>
+</CardGroup>
