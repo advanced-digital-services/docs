@@ -1,0 +1,341 @@
+---
+title: 'Autenticação'
+description: 'Como autenticar e obter tokens de acesso na API Avista'
+---
+
+## Visão Geral
+
+A API Avista utiliza autenticação baseada em **OAuth 2.0** com **certificados X.509 (mTLS)**. Este modelo de segurança em camadas garante que apenas clientes autorizados com certificados válidos possam acessar a API.
+
+### Por que mTLS?
+
+O mTLS (mutual TLS) oferece segurança superior comparado a tokens simples:
+
+- **Autenticação mútua**: Tanto o cliente quanto o servidor se autenticam
+- **Não-repúdio**: Certificados vinculados à conta garantem rastreabilidade
+- **Proteção contra roubo de credenciais**: Mesmo com clientId/clientSecret vazados, o atacante precisaria do certificado
+
+## Pré-requisitos
+
+Antes de iniciar, você precisará:
+
+<Steps>
+  <Step title="Certificado Digital X.509">
+    Obtenha seu certificado cliente através do portal Avista. O certificado deve estar no formato PEM e será **vinculado à sua conta**.
+  </Step>
+  <Step title="Credenciais OAuth">
+    Solicite suas credenciais (`clientId` e `clientSecret`) no painel administrativo.
+  </Step>
+  <Step title="Configuração do Ambiente">
+    Configure seu ambiente para enviar o certificado no header `X-SSL-Client-Cert`.
+  </Step>
+</Steps>
+
+<Warning>
+  O certificado X.509 deve estar **vinculado à sua conta** antes de ser utilizado. Certificados não vinculados serão rejeitados mesmo que válidos.
+</Warning>
+
+## Endpoint de Autenticação
+
+### POST /api/auth/token
+
+Gera um token JWT de acesso válido por **30 minutos** (1800 segundos).
+
+<Info>
+  O certificado X.509 deve ser enviado **URL-encoded** no header `X-SSL-Client-Cert`. O sistema valida o fingerprint SHA256 do certificado contra os registros vinculados à conta.
+</Info>
+
+#### Request
+
+```bash
+curl -X POST https://api.avista.global/api/auth/token \
+  -H "Content-Type: application/json" \
+  -H "X-SSL-Client-Cert: -----BEGIN%20CERTIFICATE-----%0AMIIB..." \
+  -d '{
+    "clientId": "account-93-550e8400",
+    "clientSecret": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+  }'
+```
+
+#### Response (201 Created)
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 1800
+}
+```
+
+## Exemplo Prático: Node.js
+
+### Instalação
+
+```bash
+npm install axios
+```
+
+### Código Completo
+
+```javascript
+const axios = require('axios');
+const fs = require('fs');
+
+// Carregar certificado X.509
+const certificate = fs.readFileSync('./client-cert.pem', 'utf8');
+const encodedCert = encodeURIComponent(certificate);
+
+// Configuração da requisição
+const config = {
+  method: 'post',
+  url: 'https://api.avista.global/api/auth/token',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-SSL-Client-Cert': encodedCert
+  },
+  data: {
+    clientId: process.env.AVISTA_CLIENT_ID,
+    clientSecret: process.env.AVISTA_CLIENT_SECRET
+  }
+};
+
+// Fazer requisição
+async function getToken() {
+  try {
+    const response = await axios(config);
+
+    console.log('Token obtido com sucesso!');
+    console.log('Expira em:', response.data.expires_in, 'segundos');
+
+    return response.data.access_token;
+  } catch (error) {
+    console.error('Erro ao obter token:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+getToken();
+```
+
+## Exemplo Prático: Python
+
+### Instalação
+
+```bash
+pip install requests
+```
+
+### Código Completo
+
+```python
+import os
+import requests
+import urllib.parse
+
+# Carregar e codificar certificado
+with open('client-cert.pem', 'r') as f:
+    certificate = f.read()
+    encoded_cert = urllib.parse.quote(certificate)
+
+# Configuração da requisição
+url = 'https://api.avista.global/api/auth/token'
+headers = {
+    'Content-Type': 'application/json',
+    'X-SSL-Client-Cert': encoded_cert
+}
+payload = {
+    'clientId': os.environ.get('AVISTA_CLIENT_ID'),
+    'clientSecret': os.environ.get('AVISTA_CLIENT_SECRET')
+}
+
+# Fazer requisição
+try:
+    response = requests.post(url, json=payload, headers=headers)
+    response.raise_for_status()
+
+    data = response.json()
+
+    print('Token obtido com sucesso!')
+    print(f"Expira em: {data['expires_in']} segundos")
+
+except requests.exceptions.RequestException as e:
+    print(f'Erro ao obter token: {e}')
+    if hasattr(e.response, 'text'):
+        print(f'Resposta: {e.response.text}')
+```
+
+## Utilizando o Token
+
+Após obter o token, inclua-o no header `Authorization` de todas as requisições:
+
+```bash
+curl -X GET https://api.avista.global/api/balance \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+## Renovação de Token
+
+<Info>
+  Tokens expiram após **30 minutos**. Implemente lógica de renovação automática em sua aplicação para evitar interrupções.
+</Info>
+
+### Estratégia Recomendada
+
+```javascript
+class TokenManager {
+  constructor(clientId, clientSecret, certificatePath) {
+    this.clientId = clientId;
+    this.clientSecret = clientSecret;
+    this.certificatePath = certificatePath;
+    this.token = null;
+    this.expiresAt = null;
+  }
+
+  async getValidToken() {
+    // Verifica se o token ainda é válido (com margem de 30 segundos)
+    if (this.token && this.expiresAt && Date.now() < this.expiresAt - 30000) {
+      return this.token;
+    }
+
+    // Renova o token
+    return await this.refreshToken();
+  }
+
+  async refreshToken() {
+    const response = await this.requestNewToken();
+    this.token = response.access_token;
+    this.expiresAt = Date.now() + (response.expires_in * 1000);
+    return this.token;
+  }
+
+  async requestNewToken() {
+    const fs = require('fs');
+    const axios = require('axios');
+
+    const certificate = fs.readFileSync(this.certificatePath, 'utf8');
+    const encodedCert = encodeURIComponent(certificate);
+
+    const response = await axios.post('https://api.avista.global/api/auth/token', {
+      clientId: this.clientId,
+      clientSecret: this.clientSecret
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-SSL-Client-Cert': encodedCert
+      }
+    });
+
+    return response.data;
+  }
+}
+
+// Uso
+const tokenManager = new TokenManager(
+  process.env.AVISTA_CLIENT_ID,
+  process.env.AVISTA_CLIENT_SECRET,
+  './client-cert.pem'
+);
+
+// Em qualquer requisição
+const token = await tokenManager.getValidToken();
+
+```
+
+## Validação do Certificado
+
+O sistema realiza as seguintes validações no certificado:
+
+1. **Formato PEM válido**: O certificado deve estar no formato PEM e URL-encoded
+2. **Vinculação à conta**: O fingerprint SHA256 do certificado deve estar registrado e vinculado à sua conta
+3. **Correspondência de credenciais**: O certificado deve pertencer à mesma conta das credenciais OAuth
+
+<Warning>
+  Certificados não vinculados ou vinculados a outra conta serão rejeitados, mesmo que tecnicamente válidos.
+</Warning>
+
+## Erros Comuns
+
+### 400 Bad Request
+
+**Causa:** Certificado ausente ou mal formatado
+
+```json
+{
+  "statusCode": 400,
+  "message": "Certificado ausente no header X-SSL-Client-Cert"
+}
+```
+
+**Solução:** Verifique se:
+- O certificado está no formato PEM
+- O certificado está URL-encoded (use `encodeURIComponent()`)
+- O header `X-SSL-Client-Cert` está presente na requisição
+
+---
+
+### 401 Unauthorized
+
+**Causa:** Credenciais inválidas ou certificado não autorizado
+
+```json
+{
+  "statusCode": 401,
+  "message": "Credenciais inválidas ou certificado inválido"
+}
+```
+
+**Solução:** Verifique se:
+- O `clientId` e `clientSecret` estão corretos
+- O certificado está **vinculado** à sua conta no portal Avista
+- O certificado corresponde às credenciais OAuth utilizadas
+
+---
+
+### 403 Forbidden
+
+**Causa:** Certificado não vinculado à conta
+
+```json
+{
+  "statusCode": 403,
+  "message": "Certificado não vinculado à conta"
+}
+```
+
+**Solução:** Entre em contato com o suporte Avista para vincular o certificado à sua conta.
+
+## Boas Práticas
+
+<AccordionGroup>
+  <Accordion title="Armazene credenciais de forma segura">
+    Nunca exponha suas credenciais em código-fonte. Use variáveis de ambiente ou cofres de segredos (AWS Secrets Manager, Azure Key Vault, etc.).
+
+    ```javascript
+    const clientId = process.env.AVISTA_CLIENT_ID;
+    const clientSecret = process.env.AVISTA_CLIENT_SECRET;
+    ```
+  </Accordion>
+
+  <Accordion title="Implemente cache de tokens">
+    Evite requisições desnecessárias armazenando tokens válidos em cache (Redis, memória, etc.).
+  </Accordion>
+
+  <Accordion title="Monitore expiração">
+    Configure alertas para detectar falhas de autenticação recorrentes, que podem indicar problemas com renovação de tokens.
+  </Accordion>
+
+  <Accordion title="Use HTTPS em produção">
+    Sempre utilize conexões HTTPS para proteger credenciais em trânsito.
+  </Accordion>
+</AccordionGroup>
+
+## Próximos Passos
+
+<CardGroup cols={2}>
+  <Card title="Consultar Saldo" icon="wallet" href="/api-reference/guides/balance">
+    Aprenda a consultar o saldo da conta
+  </Card>
+  <Card title="Gerar Cobrança PIX" icon="qrcode" href="/api-reference/guides/pix-cash-in">
+    Crie cobranças PIX dinâmicas
+  </Card>
+</CardGroup>
