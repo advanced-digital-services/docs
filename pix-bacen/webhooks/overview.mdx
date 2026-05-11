@@ -1,0 +1,287 @@
+---
+title: 'Visão Geral'
+description: 'Entenda o formato de webhooks V2 usado na API PIX Bacen'
+---
+
+## O que são Webhooks V2?
+
+Webhooks V2 são notificações enviadas para sua aplicação quando eventos importantes ocorrem em suas transações PIX. O formato V2 usa uma estrutura de envelope `{type, data}` que facilita o processamento e oferece mais detalhes sobre cada evento.
+
+<Info>
+  Para receber webhooks V2, sua conta deve estar com a versão de webhook configurada para V2. Veja [como ativar](/pix-bacen/activation).
+</Info>
+
+## Estrutura Base
+
+Todos os webhooks V2 seguem esta estrutura:
+
+```json
+{
+  "type": "RECEIVE" | "TRANSFER" | "REFUND",
+  "data": {
+    // Dados específicos do evento
+  }
+}
+```
+
+## Tipos de Evento
+
+| Type | Descrição | Equivalente V1 |
+|------|-----------|----------------|
+| `RECEIVE` | PIX recebido (Cash-In) | `CashIn` |
+| `TRANSFER` | PIX enviado (Cash-Out) | `CashOut` |
+| `REFUND` | Devolução (In ou Out) | `CashInReversal` / `CashOutReversal` |
+
+## Estrutura Completa do Data
+
+```typescript
+interface WebhookV2Data {
+  // Identificadores
+  id: number;                    // ID da transação
+  txId: string | null;           // Identificador da cobrança (txid)
+  endToEndId: string | null;     // End to End ID da transação PIX
+
+  // Chave PIX
+  pixKey: string | null;         // Chave PIX utilizada
+
+  // Status
+  status: 'PENDING' | 'LIQUIDATED' | 'REFUNDED' | 'ERROR';
+
+  // Pagamento
+  payment: {
+    amount: string;              // Valor (string com 2 decimais)
+    currency: string;            // Moeda (BRL)
+  };
+
+  // Devoluções
+  refunds: RefundInfo[];         // Lista de devoluções (vazio se não houver)
+
+  // Datas
+  createdAt: string;             // Data de criação (ISO 8601)
+
+  // Erro
+  errorCode: string | null;      // Código de erro (se houver)
+
+  // Tipo de operação
+  webhookType: 'RECEIVE' | 'TRANSFER' | 'REFUND';
+  creditDebitType: 'CREDIT' | 'DEBIT';
+  transactionType: 'PIX';
+  localInstrument: 'DICT';
+
+  // Contas
+  debtorAccount: AccountInfo;    // Pagador/Remetente
+  creditorAccount: AccountInfo;  // Recebedor/Destinatário
+
+  // Idempotência
+  idempotencyKey: string | null;
+
+  // Dados adicionais
+  ticketData: object;
+  remittanceInformation: string | null;  // Descrição da transação
+}
+
+interface AccountInfo {
+  ispb: string | null;           // Código ISPB do banco
+  name: string | null;           // Nome do banco
+  issuer: string | null;         // Código do banco
+  number: string | null;         // Número da conta
+  document: string | null;       // CPF/CNPJ (mascarado)
+  accountType: string | null;    // Tipo de conta
+}
+
+interface RefundInfo {
+  status: 'PENDING' | 'LIQUIDATED' | 'ERROR';
+  payment: {
+    amount: number;              // Valor do refund (number!)
+    currency: string;
+  };
+  errorCode: string | null;
+  eventDate: string;             // Data do refund
+  endToEndId: string | null;     // E2E ID do refund
+  information: string | null;    // Descrição do refund
+}
+```
+
+## Diferenças V1 vs V2
+
+<Tabs>
+  <Tab title="Estrutura">
+    | Aspecto | V1 | V2 |
+    |---------|----|----|
+    | Formato | Campos na raiz | Envelope `{type, data}` |
+    | Tipo evento | `event: "CashIn"` | `type: "RECEIVE"` |
+  </Tab>
+  <Tab title="Status">
+    | Aspecto | V1 | V2 |
+    |---------|----|----|
+    | Sucesso PIX | `CONFIRMED` | `LIQUIDATED` |
+    | Sucesso Refund | `CONFIRMED` | `REFUNDED` |
+    | Erro | `ERROR` | `ERROR` |
+  </Tab>
+  <Tab title="Contraparte">
+    | Aspecto | V1 | V2 |
+    |---------|----|----|
+    | Campo | `counterpart` | `debtorAccount` / `creditorAccount` |
+    | Banco | `bank.bankName` | `name` |
+    | ISPB | `bank.bankISPB` | `ispb` |
+  </Tab>
+  <Tab title="Valores">
+    | Aspecto | V1 | V2 |
+    |---------|----|----|
+    | Tipo | `number` | `string` |
+    | Formato | `100.00` | `"100.00"` |
+  </Tab>
+</Tabs>
+
+## Mapeamento de Contas
+
+### PIX Recebido (RECEIVE)
+
+```
+debtorAccount = Quem pagou (contraparte)
+creditorAccount = Sua conta (recebedor)
+creditDebitType = CREDIT
+```
+
+### PIX Enviado (TRANSFER)
+
+```
+debtorAccount = Sua conta (pagador)
+creditorAccount = Quem recebeu (contraparte)
+creditDebitType = DEBIT
+```
+
+### Devolução de Recebimento (REFUND - CashInReversal)
+
+```
+debtorAccount = Sua conta (devolvendo)
+creditorAccount = Quem vai receber de volta (contraparte)
+creditDebitType = DEBIT
+```
+
+### Devolução de Envio (REFUND - CashOutReversal)
+
+```
+debtorAccount = Quem está devolvendo (contraparte)
+creditorAccount = Sua conta (recebendo de volta)
+creditDebitType = CREDIT
+```
+
+## Configuração do Endpoint
+
+### Requisitos
+
+- URL HTTPS obrigatória
+- Timeout máximo: 10 segundos
+- Resposta esperada: HTTP 2xx
+
+### Autenticação
+
+Os webhooks são enviados com Basic Auth:
+
+```
+Authorization: Basic base64(username:password)
+```
+
+Configure as credenciais no painel ou entre em contato com o suporte.
+
+## Exemplo de Handler
+
+```typescript
+import express from 'express';
+
+const app = express();
+app.use(express.json());
+
+interface WebhookV2 {
+  type: 'RECEIVE' | 'TRANSFER' | 'REFUND';
+  data: WebhookV2Data;
+}
+
+// Set para idempotência
+const processedIds = new Set<number>();
+
+app.post('/webhooks/pix', (req, res) => {
+  const webhook: WebhookV2 = req.body;
+
+  // Responder rapidamente
+  res.status(200).json({ acknowledged: true });
+
+  // Verificar idempotência
+  if (processedIds.has(webhook.data.id)) {
+    console.log(`Webhook ${webhook.data.id} já processado`);
+    return;
+  }
+  processedIds.add(webhook.data.id);
+
+  // Processar por tipo
+  switch (webhook.type) {
+    case 'RECEIVE':
+      handleReceive(webhook.data);
+      break;
+    case 'TRANSFER':
+      handleTransfer(webhook.data);
+      break;
+    case 'REFUND':
+      handleRefund(webhook.data);
+      break;
+  }
+});
+
+function handleReceive(data: WebhookV2Data) {
+  if (data.status === 'LIQUIDATED') {
+    const amount = parseFloat(data.payment.amount);
+    console.log(`PIX recebido: R$ ${amount}`);
+    // Creditar no sistema
+  }
+}
+
+function handleTransfer(data: WebhookV2Data) {
+  if (data.status === 'LIQUIDATED') {
+    console.log(`PIX enviado: ${data.endToEndId}`);
+    // Confirmar transferência
+  } else if (data.status === 'ERROR') {
+    console.log(`PIX falhou: ${data.errorCode}`);
+    // Reverter operação
+  }
+}
+
+function handleRefund(data: WebhookV2Data) {
+  if (data.status === 'REFUNDED') {
+    const refund = data.refunds[0];
+    console.log(`Devolução: R$ ${refund.payment.amount}`);
+    // Processar devolução
+  }
+}
+```
+
+## Retentativas
+
+Se seu endpoint não responder com HTTP 2xx em 10 segundos:
+
+| Tentativa | Intervalo | Acumulado |
+|-----------|-----------|-----------|
+| 1ª | Imediato | 0 min |
+| 2ª | 5 minutos | 5 min |
+| 3ª | 5 minutos | 10 min |
+| 4ª | 15 minutos | 25 min |
+
+Após 4 tentativas sem sucesso, o webhook não será mais reenviado automaticamente.
+
+<Warning>
+  Implemente consulta periódica como fallback para garantir que nenhuma transação seja perdida.
+</Warning>
+
+## Próximos Passos
+
+<CardGroup cols={3}>
+  <Card title="RECEIVE" icon="arrow-down" href="/pix-bacen/webhooks/receive">
+    PIX recebido
+  </Card>
+  <Card title="TRANSFER" icon="arrow-up" href="/pix-bacen/webhooks/transfer">
+    PIX enviado
+  </Card>
+  <Card title="REFUND" icon="rotate-left" href="/pix-bacen/webhooks/refund">
+    Devolução
+  </Card>
+</CardGroup>
