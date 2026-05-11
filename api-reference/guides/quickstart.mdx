@@ -1,0 +1,343 @@
+---
+title: 'Quickstart'
+description: 'Integre com a API Avista em 5 minutos'
+---
+
+## Pré-requisitos
+
+Antes de começar, você precisa ter:
+
+<Check>Certificado X.509 (arquivo `.pem`) vinculado à sua conta</Check>
+<Check>Credenciais OAuth (`clientId` e `clientSecret`)</Check>
+
+<Info>
+  Solicite suas credenciais e certificado através do [Painel Avista](https://dashboard.avista.global).
+</Info>
+
+## 1. Configurar Ambiente
+
+Crie um arquivo `.env` com suas credenciais:
+
+```bash
+AVISTA_CLIENT_ID=account-93-seu-id
+AVISTA_CLIENT_SECRET=sua-senha-secreta
+AVISTA_API_URL=https://api.avista.global
+```
+
+Salve seu certificado como `client-cert.pem` no diretório do projeto.
+
+## 2. Instalar Dependências
+
+<CodeGroup>
+
+```bash Node.js
+npm install axios dotenv
+```
+
+```bash Python
+pip install requests python-dotenv
+```
+
+</CodeGroup>
+
+## 3. Código Completo
+
+O exemplo abaixo autentica, consulta saldo e cria uma cobrança PIX:
+
+<CodeGroup>
+
+```javascript Node.js
+require('dotenv').config();
+const axios = require('axios');
+const fs = require('fs');
+
+const API_URL = process.env.AVISTA_API_URL;
+const certificate = fs.readFileSync('./client-cert.pem', 'utf8');
+const encodedCert = encodeURIComponent(certificate);
+
+// 1. Obter token
+async function getToken() {
+  const response = await axios.post(`${API_URL}/api/auth/token`, {
+    clientId: process.env.AVISTA_CLIENT_ID,
+    clientSecret: process.env.AVISTA_CLIENT_SECRET
+  }, {
+    headers: {
+      'Content-Type': 'application/json',
+      'X-SSL-Client-Cert': encodedCert
+    }
+  });
+  return response.data.access_token;
+}
+
+// 2. Consultar saldo
+async function getBalance(token) {
+  const response = await axios.get(`${API_URL}/api/balance`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  return response.data;
+}
+
+// 3. Criar cobrança PIX
+async function createPixCharge(token, value, description, externalId, payer) {
+  const response = await axios.post(`${API_URL}/api/pix/cash-in`, {
+    transaction: {
+      value,
+      description,
+      externalId,
+      expirationTime: 3600, // 1 hora
+      generateQrCode: true
+    },
+    payer: {
+      fullName: payer.name,
+      document: payer.document
+    }
+  }, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  return response.data;
+}
+
+// Executar
+async function main() {
+  try {
+    // Autenticar
+    console.log('Autenticando...');
+    const token = await getToken();
+    console.log('Token obtido com sucesso!');
+
+    // Consultar saldo
+    console.log('\nConsultando saldo...');
+    const balance = await getBalance(token);
+    console.log(`Saldo disponível: R$ ${balance.netBalance.toFixed(2)}`);
+
+    // Criar cobrança
+    console.log('\nCriando cobrança PIX...');
+    const charge = await createPixCharge(token, 100.00, 'Teste de integração', 'ORDER-001', {
+      name: 'João da Silva',
+      document: '12345678901'
+    });
+
+    console.log(`\nCobrança criada!`);
+    console.log(`ID: ${charge.transactionId}`);
+    console.log(`Status: ${charge.status}`);
+    console.log(`PIX Copia e Cola: ${charge.pixCode}`);
+    console.log(`Expira em: ${charge.expirationDate}`);
+
+  } catch (error) {
+    console.error('Erro:', error.response?.data || error.message);
+  }
+}
+
+main();
+```
+
+```python Python
+import os
+import urllib.parse
+import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+
+API_URL = os.getenv('AVISTA_API_URL')
+
+# Carregar certificado
+with open('client-cert.pem', 'r') as f:
+    certificate = f.read()
+    encoded_cert = urllib.parse.quote(certificate)
+
+# 1. Obter token
+def get_token():
+    response = requests.post(f'{API_URL}/api/auth/token',
+        json={
+            'clientId': os.getenv('AVISTA_CLIENT_ID'),
+            'clientSecret': os.getenv('AVISTA_CLIENT_SECRET')
+        },
+        headers={
+            'Content-Type': 'application/json',
+            'X-SSL-Client-Cert': encoded_cert
+        }
+    )
+    response.raise_for_status()
+    return response.json()['access_token']
+
+# 2. Consultar saldo
+def get_balance(token):
+    response = requests.get(f'{API_URL}/api/balance',
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    response.raise_for_status()
+    return response.json()
+
+# 3. Criar cobrança PIX
+def create_pix_charge(token, value, description, external_id, payer_name, payer_document):
+    response = requests.post(f'{API_URL}/api/pix/cash-in',
+        json={
+            'transaction': {
+                'value': value,
+                'description': description,
+                'externalId': external_id,
+                'expirationTime': 3600,
+                'generateQrCode': True
+            },
+            'payer': {
+                'fullName': payer_name,
+                'document': payer_document
+            }
+        },
+        headers={
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json'
+        }
+    )
+    response.raise_for_status()
+    return response.json()
+
+# Executar
+def main():
+    try:
+        # Autenticar
+        print('Autenticando...')
+        token = get_token()
+        print('Token obtido com sucesso!')
+
+        # Consultar saldo
+        print('\nConsultando saldo...')
+        balance = get_balance(token)
+        print(f"Saldo disponível: R$ {balance['netBalance']:.2f}")
+
+        # Criar cobrança
+        print('\nCriando cobrança PIX...')
+        charge = create_pix_charge(
+            token,
+            100.00,
+            'Teste de integração',
+            'ORDER-001',
+            'João da Silva',
+            '12345678901'
+        )
+
+        print(f"\nCobrança criada!")
+        print(f"ID: {charge['transactionId']}")
+        print(f"Status: {charge['status']}")
+        print(f"PIX Copia e Cola: {charge['pixCode']}")
+        print(f"Expira em: {charge['expirationDate']}")
+
+    except requests.exceptions.RequestException as e:
+        print(f'Erro: {e.response.json() if e.response else e}')
+
+if __name__ == '__main__':
+    main()
+```
+
+</CodeGroup>
+
+## 4. Executar
+
+<CodeGroup>
+
+```bash Node.js
+node quickstart.js
+```
+
+```bash Python
+python quickstart.py
+```
+
+</CodeGroup>
+
+**Saída esperada:**
+
+```
+Autenticando...
+Token obtido com sucesso!
+
+Consultando saldo...
+Saldo disponível: R$ 48734.90
+
+Criando cobrança PIX...
+
+Cobrança criada!
+ID: 7845
+Status: PENDING
+PIX Copia e Cola: 00020126580014br.gov.bcb.pix...
+Expira em: 2024-01-20T14:30:00.000Z
+```
+
+## 5. Receber Notificações (Webhook)
+
+Configure um endpoint para receber notificações quando o pagamento for confirmado:
+
+```javascript
+// Express.js
+app.post('/webhook/avista', (req, res) => {
+  const { event, transactionId, status, finalAmount } = req.body;
+
+  if (event === 'CashIn' && status === 'CONFIRMED') {
+    console.log(`Pagamento ${transactionId} confirmado: R$ ${finalAmount}`);
+    // Atualizar pedido no seu sistema
+  }
+
+  res.status(200).send('OK');
+});
+```
+
+<Info>
+  Configure a URL do webhook no [Painel Avista](https://dashboard.avista.global).
+  Veja o [Guia de Webhooks](/api-reference/guides/webhooks) para mais detalhes.
+</Info>
+
+## Próximos Passos
+
+<CardGroup cols={2}>
+  <Card title="Autenticação" icon="key" href="/api-reference/guides/authentication">
+    Entenda o fluxo de autenticação em detalhes
+  </Card>
+  <Card title="PIX Cash-In" icon="qrcode" href="/api-reference/guides/pix-cash-in">
+    Explore todas as opções de cobrança PIX
+  </Card>
+  <Card title="PIX Cash-Out" icon="money-bill-transfer" href="/api-reference/guides/pix-cash-out">
+    Envie pagamentos PIX
+  </Card>
+  <Card title="Cash-Out via QR Code" icon="qrcode" href="/api-reference/guides/pix-cash-out-qrcode">
+    Pague via QR Code PIX
+  </Card>
+  <Card title="Webhooks" icon="bell" href="/api-reference/guides/webhooks">
+    Configure notificações em tempo real
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Erro 400: Certificado ausente">
+    Verifique se:
+    - O arquivo `client-cert.pem` existe no diretório
+    - O certificado está sendo enviado URL-encoded
+    - O header `X-SSL-Client-Cert` está presente
+  </Accordion>
+
+  <Accordion title="Erro 401: Credenciais inválidas">
+    Verifique se:
+    - As variáveis de ambiente estão configuradas corretamente
+    - O `clientId` e `clientSecret` estão corretos
+    - O certificado está vinculado à sua conta
+  </Accordion>
+
+  <Accordion title="Erro 403: Certificado não vinculado">
+    Entre em contato com o suporte Avista para vincular o certificado à sua conta.
+  </Accordion>
+
+  <Accordion title="Token expirado (401 em outras requisições)">
+    O token expira em 30 minutos. Implemente renovação automática:
+    ```javascript
+    // Renovar token antes de expirar
+    if (tokenExpiresAt < Date.now() + 30000) {
+      token = await getToken();
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
