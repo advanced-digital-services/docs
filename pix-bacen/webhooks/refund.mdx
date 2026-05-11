@@ -1,0 +1,414 @@
+---
+title: 'REFUND'
+description: 'Webhook enviado quando uma devolução PIX é processada'
+---
+
+## Visão Geral
+
+O webhook `REFUND` é enviado quando uma devolução PIX é processada. Existem dois cenários:
+
+1. **CashInReversal**: Você devolveu um PIX recebido (via `/pix/:e2eid/devolucao/:id`)
+2. **CashOutReversal**: Alguém devolveu um PIX que você enviou
+
+## Quando é enviado
+
+- Devolução de PIX recebido confirmada (você devolvendo)
+- Devolução de PIX enviado recebida (alguém devolvendo para você)
+
+## Estrutura do Payload
+
+```json
+{
+  "type": "REFUND",
+  "data": {
+    "id": 123,
+    "txId": "7978c0c97ea847e78e8849634473c1f1",
+    "pixKey": "7d9f0335-8dcc-4054-9bf9-0dbd61d36906",
+    "status": "REFUNDED",
+    "payment": {
+      "amount": "100.00",
+      "currency": "BRL"
+    },
+    "refunds": [
+      {
+        "status": "LIQUIDATED",
+        "payment": {
+          "amount": 50.00,
+          "currency": "BRL"
+        },
+        "errorCode": null,
+        "eventDate": "2024-01-15T10:30:00.000Z",
+        "endToEndId": "D12345678901234567890123456789012",
+        "information": "Devolução solicitada pelo recebedor"
+      }
+    ],
+    "createdAt": "2024-01-15T09:00:00.000Z",
+    "errorCode": null,
+    "endToEndId": "E12345678901234567890123456789012",
+    "ticketData": {},
+    "webhookType": "REFUND",
+    "debtorAccount": {
+      "ispb": null,
+      "name": null,
+      "issuer": null,
+      "number": null,
+      "document": null,
+      "accountType": null
+    },
+    "idempotencyKey": "7978c0c97ea847e78e8849634473c1f1",
+    "creditDebitType": "DEBIT",
+    "creditorAccount": {
+      "ispb": "18236120",
+      "name": "NU PAGAMENTOS S.A.",
+      "issuer": "260",
+      "number": "12345-6",
+      "document": "123.xxx.xxx-xx",
+      "accountType": null
+    },
+    "localInstrument": "DICT",
+    "transactionType": "PIX",
+    "remittanceInformation": "Devolução parcial"
+  }
+}
+```
+
+## Diferença entre CashInReversal e CashOutReversal
+
+<Tabs>
+  <Tab title="CashInReversal">
+    **Você devolveu** um PIX recebido.
+
+    ```
+    creditDebitType = DEBIT (saindo da sua conta)
+    debtorAccount = Sua conta
+    creditorAccount = Quem vai receber de volta
+    ```
+
+    **Exemplo**: Você recebeu R$ 100, depois devolveu R$ 50.
+  </Tab>
+  <Tab title="CashOutReversal">
+    **Alguém devolveu** um PIX que você enviou.
+
+    ```
+    creditDebitType = CREDIT (entrando na sua conta)
+    debtorAccount = Quem está devolvendo
+    creditorAccount = Sua conta
+    ```
+
+    **Exemplo**: Você enviou R$ 100, o destinatário devolveu R$ 30.
+  </Tab>
+</Tabs>
+
+## Campos Importantes
+
+<ResponseField name="type" type="string">
+  Sempre `"REFUND"` para devoluções.
+</ResponseField>
+
+<ResponseField name="data.id" type="number">
+  ID da transação **original** (não da devolução).
+</ResponseField>
+
+<ResponseField name="data.status" type="string">
+  Status da transação original após a devolução:
+  - `REFUNDED`: Devolução processada
+  - `ERROR`: Falha na devolução
+</ResponseField>
+
+<ResponseField name="data.payment" type="object">
+  Valor da transação **original**, não da devolução.
+
+  <Expandable title="Propriedades">
+    <ResponseField name="amount" type="string">
+      Valor original. **String** com 2 casas decimais.
+    </ResponseField>
+    <ResponseField name="currency" type="string">
+      Moeda. Sempre `"BRL"`.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="data.refunds" type="array">
+  Lista de devoluções realizadas. Contém detalhes de cada devolução.
+
+  <Expandable title="Item">
+    <ResponseField name="status" type="string">
+      Status da devolução: `LIQUIDATED` ou `ERROR`.
+    </ResponseField>
+    <ResponseField name="payment.amount" type="number">
+      Valor da devolução. **Atenção**: É `number`, não `string`!
+    </ResponseField>
+    <ResponseField name="endToEndId" type="string">
+      E2E ID da devolução (diferente do E2E da transação original).
+    </ResponseField>
+    <ResponseField name="eventDate" type="string">
+      Data/hora da devolução.
+    </ResponseField>
+    <ResponseField name="information" type="string">
+      Descrição da devolução.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="data.creditDebitType" type="string">
+  Direção do dinheiro:
+  - `DEBIT`: Saindo da sua conta (CashInReversal)
+  - `CREDIT`: Entrando na sua conta (CashOutReversal)
+</ResponseField>
+
+<ResponseField name="data.endToEndId" type="string">
+  E2E ID da transação **original**.
+</ResponseField>
+
+## Processando o Webhook
+
+### Exemplo Node.js
+
+```typescript
+interface RefundWebhook {
+  type: 'REFUND';
+  data: {
+    id: number;
+    txId: string | null;
+    status: 'REFUNDED' | 'ERROR';
+    payment: {
+      amount: string;
+      currency: string;
+    };
+    refunds: Array<{
+      status: 'LIQUIDATED' | 'ERROR';
+      payment: {
+        amount: number;  // number, não string!
+        currency: string;
+      };
+      endToEndId: string;
+      eventDate: string;
+      information: string | null;
+    }>;
+    endToEndId: string;
+    creditDebitType: 'CREDIT' | 'DEBIT';
+  };
+}
+
+async function handleRefund(webhook: RefundWebhook) {
+  const { data } = webhook;
+
+  // Identificar tipo de devolução
+  const isCashInReversal = data.creditDebitType === 'DEBIT';
+
+  if (isCashInReversal) {
+    // Você devolveu um PIX recebido
+    await handleCashInReversal(data);
+  } else {
+    // Alguém devolveu um PIX que você enviou
+    await handleCashOutReversal(data);
+  }
+}
+
+async function handleCashInReversal(data: RefundWebhook['data']) {
+  // Encontrar transação original
+  const original = await findTransactionByE2eId(data.endToEndId);
+
+  // Processar cada devolução
+  for (const refund of data.refunds) {
+    if (refund.status === 'LIQUIDATED') {
+      // Devolução confirmada - debitar do saldo
+      await processRefundOut({
+        originalId: original.id,
+        refundAmount: refund.payment.amount,  // já é number
+        refundE2eId: refund.endToEndId,
+      });
+
+      console.log(`Devolvido R$ ${refund.payment.amount} do PIX ${original.id}`);
+    }
+  }
+}
+
+async function handleCashOutReversal(data: RefundWebhook['data']) {
+  // Encontrar transferência original
+  const original = await findTransferByE2eId(data.endToEndId);
+
+  // Processar cada devolução recebida
+  for (const refund of data.refunds) {
+    if (refund.status === 'LIQUIDATED') {
+      // Devolução recebida - creditar no saldo
+      await processRefundIn({
+        originalId: original.id,
+        refundAmount: refund.payment.amount,
+        refundE2eId: refund.endToEndId,
+      });
+
+      console.log(`Recebido R$ ${refund.payment.amount} de devolução`);
+    }
+  }
+}
+```
+
+### Exemplo Python
+
+```python
+from decimal import Decimal
+
+def handle_refund(webhook: dict):
+    data = webhook['data']
+
+    # Identificar tipo
+    is_cash_in_reversal = data['creditDebitType'] == 'DEBIT'
+
+    if is_cash_in_reversal:
+        handle_cash_in_reversal(data)
+    else:
+        handle_cash_out_reversal(data)
+
+
+def handle_cash_in_reversal(data: dict):
+    """Você devolveu um PIX recebido"""
+    original = find_transaction_by_e2e(data['endToEndId'])
+
+    for refund in data['refunds']:
+        if refund['status'] == 'LIQUIDATED':
+            # Já é number, converter para Decimal
+            amount = Decimal(str(refund['payment']['amount']))
+
+            process_refund_out(
+                original_id=original.id,
+                refund_amount=amount,
+                refund_e2e=refund['endToEndId']
+            )
+
+
+def handle_cash_out_reversal(data: dict):
+    """Alguém devolveu um PIX que você enviou"""
+    original = find_transfer_by_e2e(data['endToEndId'])
+
+    for refund in data['refunds']:
+        if refund['status'] == 'LIQUIDATED':
+            amount = Decimal(str(refund['payment']['amount']))
+
+            process_refund_in(
+                original_id=original.id,
+                refund_amount=amount,
+                refund_e2e=refund['endToEndId']
+            )
+```
+
+## Devoluções Parciais
+
+Uma transação pode ter múltiplas devoluções parciais. O array `refunds` contém todas:
+
+```json
+{
+  "type": "REFUND",
+  "data": {
+    "payment": { "amount": "100.00" },  // Valor original: R$ 100
+    "refunds": [
+      {
+        "payment": { "amount": 30.00 },  // 1ª devolução: R$ 30
+        "eventDate": "2024-01-15T10:00:00Z"
+      },
+      {
+        "payment": { "amount": 50.00 },  // 2ª devolução: R$ 50
+        "eventDate": "2024-01-15T11:00:00Z"
+      }
+    ]
+  }
+}
+```
+
+**Cálculo do saldo de devolução:**
+```typescript
+const valorOriginal = parseFloat(data.payment.amount);  // 100.00
+const totalDevolvido = data.refunds
+  .filter(r => r.status === 'LIQUIDATED')
+  .reduce((sum, r) => sum + r.payment.amount, 0);  // 80.00
+const saldoDisponivel = valorOriginal - totalDevolvido;  // 20.00
+```
+
+## Atenção: amount é number em refunds
+
+<Warning>
+  Dentro do array `refunds`, o campo `payment.amount` é **number**, não **string**!
+
+  ```typescript
+  // data.payment.amount → string "100.00"
+  // data.refunds[0].payment.amount → number 50.00
+
+  // CORRETO
+  const refundAmount = data.refunds[0].payment.amount;  // 50.00 (number)
+
+  // ERRADO - não precisa de parseFloat
+  const refundAmount = parseFloat(data.refunds[0].payment.amount);
+  ```
+</Warning>
+
+## Idempotência
+
+Use uma combinação de `data.id` e `refunds[].endToEndId` para idempotência:
+
+```typescript
+async function handleWebhook(webhook: RefundWebhook) {
+  for (const refund of webhook.data.refunds) {
+    const key = `refund:${webhook.data.id}:${refund.endToEndId}`;
+
+    const isProcessed = await redis.sismember('processed', key);
+    if (isProcessed) {
+      continue;  // Já processado
+    }
+
+    await redis.sadd('processed', key);
+    await processRefund(webhook.data, refund);
+  }
+}
+```
+
+## Tratamento de Erros
+
+Se `refund.status === 'ERROR'`, a devolução falhou:
+
+```typescript
+for (const refund of data.refunds) {
+  if (refund.status === 'ERROR') {
+    console.error(`Devolução falhou: ${refund.errorCode}`);
+
+    // Notificar sobre falha
+    await notifyRefundFailed({
+      originalE2eId: data.endToEndId,
+      refundE2eId: refund.endToEndId,
+      errorCode: refund.errorCode,
+    });
+  }
+}
+```
+
+## Boas Práticas
+
+<AccordionGroup>
+  <Accordion title="Identifique o tipo pela creditDebitType">
+    Use `creditDebitType` para determinar se é CashInReversal (DEBIT) ou CashOutReversal (CREDIT).
+  </Accordion>
+
+  <Accordion title="Processe todas as devoluções do array">
+    O array `refunds` pode conter múltiplas devoluções parciais. Itere por todas.
+  </Accordion>
+
+  <Accordion title="Cuidado com os tipos de amount">
+    - `data.payment.amount` é **string**
+    - `data.refunds[].payment.amount` é **number**
+  </Accordion>
+
+  <Accordion title="Atualize o saldo corretamente">
+    - CashInReversal: Debita do seu saldo
+    - CashOutReversal: Credita no seu saldo
+  </Accordion>
+</AccordionGroup>
+
+## Próximos Passos
+
+<CardGroup cols={2}>
+  <Card title="RECEIVE" icon="arrow-down" href="/pix-bacen/webhooks/receive">
+    PIX recebido
+  </Card>
+  <Card title="TRANSFER" icon="arrow-up" href="/pix-bacen/webhooks/transfer">
+    PIX enviado
+  </Card>
+</CardGroup>
