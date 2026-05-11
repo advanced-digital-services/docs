@@ -1,0 +1,95 @@
+---
+title: 'Introdução à API'
+description: 'Bem-vindo à documentação da API Pública Avista'
+---
+
+## Visão Geral
+
+A **API Pública Avista** é uma plataforma completa para integração com serviços de pagamento PIX e gestão de contas. Nossa API permite que você:
+
+- Gere cobranças PIX dinâmicas para recebimento
+- Realize pagamentos PIX para qualquer chave
+- Realize pagamentos PIX via QR Code
+- Consulte saldos em tempo real
+- Gerencie estornos de transações
+- Integre pagamentos instantâneos em sua aplicação
+
+
+## Ambiente
+
+### Produção
+```
+https://api.avista.global
+```
+
+## Autenticação
+
+Todos os endpoints da API (exceto o de geração de token) requerem autenticação via Bearer token. O processo de autenticação segue o padrão OAuth 2.0 com certificado X.509:
+
+<Steps>
+  <Step title="Obtenha suas credenciais">
+    Solicite seu `clientId` e `clientSecret` através do portal Avista
+  </Step>
+  <Step title="Configure seu certificado X.509">
+    Instale o certificado cliente fornecido em seu ambiente
+  </Step>
+  <Step title="Gere o token de acesso">
+    Use o endpoint `/api/auth/token` com suas credenciais e certificado para gerar um token Bearer
+  </Step>
+  <Step title="Utilize o token">
+    Inclua o token no header `Authorization: Bearer {token}` em todas as requisições
+  </Step>
+</Steps>
+
+<Info>
+  O token gerado tem validade de **30 minutos** e deve ser renovado após esse período.
+</Info>
+
+## Códigos de Status HTTP
+
+A API utiliza códigos de status HTTP padrão para indicar o sucesso ou falha de uma requisição:
+
+| Código | Significado | Descrição |
+|--------|------------|-----------|
+| `200` | OK | Requisição bem-sucedida (GET) |
+| `201` | Created | Recurso criado com sucesso (POST) |
+| `400` | Bad Request | Dados inválidos na requisição |
+| `401` | Unauthorized | Token ausente, inválido ou expirado |
+| `404` | Not Found | Recurso não encontrado |
+| `500` | Internal Server Error | Erro interno do servidor |
+
+## Formato de Datas
+
+Todas as datas na API seguem o padrão **ISO 8601** com timezone UTC:
+
+```
+2024-01-15T10:30:00.000Z
+```
+
+## Primeiros Passos
+
+<CardGroup cols={2}>
+  <Card title="Autenticação" icon="key" href="/api-reference/guides/authentication">
+    Aprenda a autenticar e obter tokens de acesso
+  </Card>
+  <Card title="Consultar Saldo" icon="wallet" href="/api-reference/guides/balance">
+    Consulte o saldo da sua conta
+  </Card>
+  <Card title="Gerar Cobrança PIX" icon="qrcode" href="/api-reference/guides/pix-cash-in">
+    Crie cobranças para receber pagamentos
+  </Card>
+  <Card title="Realizar Pagamento PIX" icon="money-bill-transfer" href="/api-reference/guides/pix-cash-out">
+    Envie pagamentos PIX para qualquer chave
+  </Card>
+  <Card title="Pagar via QR Code" icon="qrcode" href="/api-reference/guides/pix-cash-out-qrcode">
+    Pague escaneando QR Codes PIX
+  </Card>
+</CardGroup>
+
+## Suporte
+
+Para questões técnicas ou suporte, entre em contato:
+
+- **Email:** suporte@avista.com.br
+- **Documentação:** https://docs.avista.com.br
+- **Status da API:** https://status.avista.com.br
