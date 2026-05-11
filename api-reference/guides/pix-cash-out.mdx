@@ -1,0 +1,825 @@
+---
+title: 'PIX Cash-Out (Pagamento)'
+description: 'Como realizar pagamentos PIX para qualquer chave'
+---
+
+## Visão Geral
+
+O endpoint **PIX Cash-Out** permite que você realize pagamentos PIX instantâneos para qualquer chave PIX válida (CPF, CNPJ, telefone, email ou chave aleatória). O pagamento é processado em tempo real e o valor é debitado da sua conta imediatamente.
+
+<Warning>
+  Para pagamentos via QR Code PIX (escaneamento ou copia-e-cola), utilize o endpoint dedicado [Cash-Out via QR Code](/api-reference/guides/pix-cash-out-qrcode). Este endpoint é exclusivo para pagamentos por chave PIX.
+</Warning>
+
+<Info>
+  Este endpoint requer um token Bearer válido. Verifique a [documentação de autenticação](/api-reference/guides/authentication) para mais detalhes.
+</Info>
+
+## Características
+
+- Pagamentos instantâneos 24/7
+- Suporte a todos os tipos de chave PIX
+- Validação automática de dados do destinatário
+- Identificação única por `externalId`
+- Descrição personalizável para o destinatário
+- Verificação de saldo automática
+
+## Endpoint
+
+### POST /api/pix/cash-out
+
+Realiza um pagamento PIX.
+
+#### Headers Obrigatórios
+
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+#### Request Body
+
+```json
+{
+  "value": 250.50,
+  "details": {
+    "key": "12345678901",
+    "keyType": "DOCUMENT",
+    "name": "Ana Costa",
+    "document": "12345678901"
+  },
+  "externalId": "PAYMENT-987654-20240119",
+  "description": "Pagamento de fornecedor"
+}
+```
+
+#### Request
+
+```bash
+curl -X POST https://api.avista.global/api/pix/cash-out \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "value": 250.50,
+    "details": {
+      "key": "12345678901",
+      "keyType": "DOCUMENT",
+      "name": "Ana Costa",
+      "document": "12345678901"
+    },
+    "externalId": "PAYMENT-987654-20240119",
+    "description": "Pagamento de fornecedor"
+  }'
+```
+
+#### Response (201 Created)
+
+```json
+{
+  "transactionId": "9876",
+  "externalId": "PAYMENT-987654-20240119",
+  "status": "PENDING",
+  "generateTime": "2024-01-19T15:45:00.000Z"
+}
+```
+
+## Parâmetros da Requisição
+
+<ParamField path="value" type="number" required>
+  Valor do pagamento em reais (BRL). Deve ter no máximo 2 casas decimais.
+
+  **Mínimo:** `0.01`
+
+  **Exemplo:** `250.50`
+</ParamField>
+
+<ParamField path="details" type="object" required>
+  Informações da chave PIX de destino.
+</ParamField>
+
+<ParamField path="details.key" type="string" required>
+  Chave PIX de destino.
+
+  **Formatos aceitos:**
+  - CPF: `12345678901` (11 dígitos)
+  - CNPJ: `12345678000199` (14 dígitos)
+  - Email: `usuario@exemplo.com`
+  - Telefone: `5511999999999` (com DDI e DDD)
+  - Chave aleatória: UUID formato `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+</ParamField>
+
+<ParamField path="details.keyType" type="string" required>
+  Tipo da chave PIX.
+
+  **Valores aceitos:**
+  - `DOCUMENT` - CPF ou CNPJ
+  - `EMAIL` - Endereço de email
+  - `PHONE` - Número de telefone
+  - `RANDOM` - Chave aleatória (UUID)
+
+  **Exemplo:** `"DOCUMENT"`
+</ParamField>
+
+<ParamField path="details.name" type="string" required>
+  Nome completo do titular da chave PIX de destino.
+
+  **Validação:** O nome deve corresponder ao cadastrado na chave PIX
+
+  **Exemplo:** `"Ana Costa"`
+</ParamField>
+
+<ParamField path="details.document" type="string" required>
+  CPF ou CNPJ do titular (apenas números).
+
+  **CPF:** 11 dígitos
+
+  **CNPJ:** 14 dígitos
+
+  **Validação:** O documento deve corresponder ao cadastrado na chave PIX
+
+  **Exemplo:** `"12345678901"`
+</ParamField>
+
+<ParamField path="externalId" type="string" required>
+  Identificador único externo da transação.
+
+  **Máximo:** 255 caracteres
+
+  **Recomendação:** Use um formato que garanta unicidade
+
+  **Exemplo:** `"PAYMENT-987654-20240119-154500"`
+</ParamField>
+
+<ParamField path="description" type="string">
+  Descrição do pagamento que aparecerá no extrato do destinatário.
+
+  **Máximo:** 140 caracteres
+
+  **Padrão:** Vazio
+
+  **Exemplo:** `"Pagamento de fornecedor - Nota Fiscal 12345"`
+</ParamField>
+
+## Estrutura da Resposta
+
+<ResponseField name="transactionId" type="string" required>
+  ID interno da transação gerada pela Avista.
+
+  **Exemplo:** `"9876"`
+</ResponseField>
+
+<ResponseField name="externalId" type="string" required>
+  ID externo fornecido na requisição (mesmo valor do input).
+
+  **Exemplo:** `"PAYMENT-987654-20240119"`
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Status atual da transação.
+
+  **Valores possíveis:**
+  - `PENDING`: Pagamento em processamento
+  - `CONFIRMED`: Pagamento confirmado e finalizado
+  - `ERROR`: Erro no processamento
+
+  **Exemplo:** `"PENDING"`
+
+  **Nota:** A maioria dos pagamentos PIX é confirmada em poucos segundos
+</ResponseField>
+
+<ResponseField name="generateTime" type="string" required>
+  Data e hora de criação do pagamento (ISO 8601 UTC).
+
+  **Exemplo:** `"2024-01-19T15:45:00.000Z"`
+</ResponseField>
+
+## Exemplos de Implementação
+
+### Node.js / TypeScript
+
+```typescript
+import axios from 'axios';
+
+interface CashOutRequest {
+  value: number;
+  details: {
+    key: string;
+    keyType: 'DOCUMENT' | 'EMAIL' | 'PHONE' | 'RANDOM';
+    name: string;
+    document: string;
+  };
+  externalId: string;
+  description?: string;
+}
+
+interface CashOutResponse {
+  transactionId: string;
+  externalId: string;
+  status: 'PENDING' | 'CONFIRMED' | 'ERROR';
+  generateTime: string;
+}
+
+async function sendPixPayment(
+  token: string,
+  recipientKey: string,
+  recipientKeyType: 'DOCUMENT' | 'EMAIL' | 'PHONE' | 'RANDOM',
+  recipientName: string,
+  recipientDocument: string,
+  amount: number,
+  description?: string
+): Promise<CashOutResponse> {
+  const payload: CashOutRequest = {
+    value: amount,
+    details: {
+      key: recipientKey,
+      keyType: recipientKeyType,
+      name: recipientName,
+      document: recipientDocument
+    },
+    externalId: `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    description: description || `Pagamento PIX de R$ ${amount.toFixed(2)}`
+  };
+
+  try {
+    const response = await axios.post<CashOutResponse>(
+      'https://api.avista.global/api/pix/cash-out',
+      payload,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    console.log('Pagamento PIX iniciado com sucesso!');
+    console.log(`ID da Transação: ${response.data.transactionId}`);
+    console.log(`Status: ${response.data.status}`);
+    console.log(`Valor: R$ ${amount.toFixed(2)}`);
+    console.log(`Destinatário: ${recipientName}`);
+
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorData = error.response?.data;
+      console.error('Erro ao realizar pagamento:', errorData);
+
+      // Tratar erros específicos
+      if (error.response?.status === 400) {
+        if (errorData?.message?.includes('saldo insuficiente')) {
+          throw new Error('Saldo insuficiente para realizar o pagamento');
+        }
+        throw new Error('Dados inválidos: ' + errorData?.message);
+      }
+
+      throw new Error(errorData?.message || 'Erro ao realizar pagamento PIX');
+    }
+    throw error;
+  }
+}
+
+// Uso - Pagamento por CPF
+sendPixPayment(
+  'seu_token_aqui',
+  '12345678901',
+  'DOCUMENT',
+  'Ana Costa',
+  '12345678901',
+  250.50,
+  'Pagamento de fornecedor'
+);
+
+// Uso - Pagamento por Email
+sendPixPayment(
+  'seu_token_aqui',
+  'ana.costa@email.com',
+  'EMAIL',
+  'Ana Costa',
+  '12345678901',
+  100.00,
+  'Reembolso'
+);
+
+// Uso - Pagamento por Telefone
+sendPixPayment(
+  'seu_token_aqui',
+  '5511999999999',
+  'PHONE',
+  'Ana Costa',
+  '12345678901',
+  50.00
+);
+```
+
+### Python
+
+```python
+import requests
+from datetime import datetime
+from typing import Dict, Optional
+import uuid
+
+def send_pix_payment(
+    token: str,
+    recipient_key: str,
+    recipient_key_type: str,
+    recipient_name: str,
+    recipient_document: str,
+    amount: float,
+    description: Optional[str] = None
+) -> Dict:
+    """
+    Envia um pagamento PIX
+
+    Args:
+        token: Token Bearer válido
+        recipient_key: Chave PIX do destinatário
+        recipient_key_type: Tipo da chave (DOCUMENT, EMAIL, PHONE, RANDOM)
+        recipient_name: Nome do destinatário
+        recipient_document: CPF ou CNPJ do destinatário
+        amount: Valor em reais
+        description: Descrição do pagamento (opcional)
+
+    Returns:
+        Dados do pagamento iniciado
+    """
+    url = 'https://api.avista.global/api/pix/cash-out'
+
+    payload = {
+        'value': round(amount, 2),
+        'details': {
+            'key': recipient_key,
+            'keyType': recipient_key_type,
+            'name': recipient_name,
+            'document': recipient_document
+        },
+        'externalId': f'PAY-{int(datetime.now().timestamp())}-{uuid.uuid4().hex[:8]}',
+        'description': description or f'Pagamento PIX de R$ {amount:.2f}'
+    }
+
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+
+        data = response.json()
+
+        print('Pagamento PIX iniciado com sucesso!')
+        print(f"ID da Transação: {data['transactionId']}")
+        print(f"Status: {data['status']}")
+        print(f"Valor: R$ {amount:.2f}")
+        print(f"Destinatário: {recipient_name}")
+
+        return data
+
+    except requests.exceptions.HTTPError as e:
+        error_data = e.response.json() if e.response else {}
+
+        # Tratar erros específicos
+        if e.response.status_code == 400:
+            if 'saldo insuficiente' in error_data.get('message', '').lower():
+                raise Exception('Saldo insuficiente para realizar o pagamento')
+            raise Exception(f"Dados inválidos: {error_data.get('message')}")
+
+        raise Exception(f"Erro ao realizar pagamento: {error_data.get('message', str(e))}")
+
+# Uso
+token = 'seu_token_aqui'
+
+# Pagamento por CPF
+payment = send_pix_payment(
+    token=token,
+    recipient_key='12345678901',
+    recipient_key_type='DOCUMENT',
+    recipient_name='Ana Costa',
+    recipient_document='12345678901',
+    amount=250.50,
+    description='Pagamento de fornecedor'
+)
+```
+
+### PHP
+
+```php
+<?php
+
+function sendPixPayment(
+    string $token,
+    string $recipientKey,
+    string $recipientKeyType,
+    string $recipientName,
+    string $recipientDocument,
+    float $amount,
+    ?string $description = null
+): array {
+    $url = 'https://api.avista.global/api/pix/cash-out';
+
+    $payload = [
+        'value' => round($amount, 2),
+        'details' => [
+            'key' => $recipientKey,
+            'keyType' => $recipientKeyType,
+            'name' => $recipientName,
+            'document' => $recipientDocument
+        ],
+        'externalId' => 'PAY-' . time() . '-' . bin2hex(random_bytes(4)),
+        'description' => $description ?? "Pagamento PIX de R$ " . number_format($amount, 2, ',', '.')
+    ];
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Authorization: Bearer ' . $token,
+        'Content-Type: application/json'
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode !== 201) {
+        $errorData = json_decode($response, true);
+        $errorMessage = $errorData['message'] ?? "HTTP $httpCode";
+
+        if ($httpCode === 400 && stripos($errorMessage, 'saldo insuficiente') !== false) {
+            throw new Exception('Saldo insuficiente para realizar o pagamento');
+        }
+
+        throw new Exception("Erro ao realizar pagamento: $errorMessage");
+    }
+
+    $data = json_decode($response, true);
+
+    echo "Pagamento PIX iniciado com sucesso!" . PHP_EOL;
+    echo "ID da Transação: {$data['transactionId']}" . PHP_EOL;
+    echo "Status: {$data['status']}" . PHP_EOL;
+    echo "Valor: R$ " . number_format($amount, 2, ',', '.') . PHP_EOL;
+    echo "Destinatário: $recipientName" . PHP_EOL;
+
+    return $data;
+}
+
+// Uso
+$token = 'seu_token_aqui';
+$payment = sendPixPayment(
+    $token,
+    '12345678901',
+    'DOCUMENT',
+    'Ana Costa',
+    '12345678901',
+    250.50,
+    'Pagamento de fornecedor'
+);
+```
+
+## Casos de Uso
+
+### 1. Folha de Pagamento
+
+```typescript
+class PayrollProcessor {
+  constructor(private token: string) {}
+
+  async processPayroll(employees: Employee[]) {
+    const results = {
+      successful: [],
+      failed: []
+    };
+
+    for (const employee of employees) {
+      try {
+        // Verificar saldo antes de cada pagamento
+        const balance = await getBalance(this.token);
+
+        if (balance.netBalance < employee.salary) {
+          throw new Error('Saldo insuficiente');
+        }
+
+        // Realizar pagamento
+        const payment = await sendPixPayment(
+          this.token,
+          employee.pixKey,
+          employee.pixKeyType,
+          employee.fullName,
+          employee.document,
+          employee.salary,
+          `Salário ${new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`
+        );
+
+        results.successful.push({
+          employee: employee.fullName,
+          amount: employee.salary,
+          transactionId: payment.transactionId
+        });
+
+        // Aguardar 1 segundo entre pagamentos
+        await this.sleep(1000);
+
+      } catch (error) {
+        results.failed.push({
+          employee: employee.fullName,
+          error: error.message
+        });
+      }
+    }
+
+    return results;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+// Uso
+interface Employee {
+  fullName: string;
+  document: string;
+  pixKey: string;
+  pixKeyType: 'DOCUMENT' | 'EMAIL' | 'PHONE' | 'RANDOM';
+  salary: number;
+}
+
+const payroll = new PayrollProcessor('seu_token_aqui');
+const employees: Employee[] = [
+  {
+    fullName: 'Pedro Santos',
+    document: '12345678901',
+    pixKey: '12345678901',
+    pixKeyType: 'DOCUMENT',
+    salary: 3500.00
+  },
+  // ... mais funcionários
+];
+
+const results = await payroll.processPayroll(employees);
+console.log(`Pagamentos bem-sucedidos: ${results.successful.length}`);
+console.log(`Pagamentos com erro: ${results.failed.length}`);
+```
+
+### 2. Marketplace - Repasse para Vendedores
+
+```python
+class MarketplacePayouts:
+    """Processa repasses para vendedores de marketplace"""
+
+    def __init__(self, token: str):
+        self.token = token
+
+    def process_seller_payouts(self, sales_data: list) -> dict:
+        """Processa repasses baseados em vendas"""
+        results = {'successful': [], 'failed': []}
+
+        # Agrupar vendas por vendedor
+        seller_totals = self.group_sales_by_seller(sales_data)
+
+        for seller_id, total_amount in seller_totals.items():
+            try:
+                # Buscar dados do vendedor
+                seller = self.get_seller_data(seller_id)
+
+                # Calcular valor após comissão
+                commission = total_amount * 0.10  # 10% de comissão
+                payout_amount = total_amount - commission
+
+                # Realizar pagamento
+                payment = send_pix_payment(
+                    token=self.token,
+                    recipient_key=seller['pix_key'],
+                    recipient_key_type=seller['pix_key_type'],
+                    recipient_name=seller['name'],
+                    recipient_document=seller['document'],
+                    amount=payout_amount,
+                    description=f'Repasse de vendas - {len(sales_data)} transações'
+                )
+
+                results['successful'].append({
+                    'seller': seller['name'],
+                    'gross_amount': total_amount,
+                    'commission': commission,
+                    'net_amount': payout_amount,
+                    'transaction_id': payment['transactionId']
+                })
+
+                # Registrar repasse no banco de dados
+                self.record_payout(seller_id, payment)
+
+            except Exception as e:
+                results['failed'].append({
+                    'seller_id': seller_id,
+                    'error': str(e)
+                })
+
+        return results
+
+    def group_sales_by_seller(self, sales_data: list) -> dict:
+        """Agrupa vendas por vendedor"""
+        totals = {}
+        for sale in sales_data:
+            seller_id = sale['seller_id']
+            totals[seller_id] = totals.get(seller_id, 0) + sale['amount']
+        return totals
+```
+
+### 3. Sistema de Reembolso
+
+```javascript
+class RefundSystem {
+  constructor(token) {
+    this.token = token;
+  }
+
+  async processRefund(orderId, refundReason) {
+    // Buscar dados do pedido
+    const order = await this.getOrderData(orderId);
+
+    // Validar se reembolso é permitido
+    if (!this.canRefund(order)) {
+      throw new Error('Reembolso não permitido para este pedido');
+    }
+
+    // Realizar pagamento de volta ao cliente
+    const refund = await sendPixPayment(
+      this.token,
+      order.customer.pixKey,
+      order.customer.pixKeyType,
+      order.customer.name,
+      order.customer.document,
+      order.amount,
+      `Reembolso - Pedido ${orderId} - ${refundReason}`
+    );
+
+    // Atualizar status do pedido
+    await this.updateOrderStatus(orderId, 'REFUNDED', refund.transactionId);
+
+    // Enviar notificação ao cliente
+    await this.notifyCustomer(order.customer.email, refund);
+
+    return refund;
+  }
+
+  canRefund(order) {
+    // Verificar se pedido foi pago e ainda está dentro do prazo
+    const daysSincePurchase = (Date.now() - new Date(order.paidAt)) / (1000 * 60 * 60 * 24);
+    return order.status === 'PAID' && daysSincePurchase <= 7;
+  }
+}
+```
+
+## Validação de Chave PIX
+
+Antes de enviar um pagamento, valide o formato da chave PIX:
+
+```typescript
+function validatePixKey(key: string, keyType: string): boolean {
+  switch (keyType) {
+    case 'DOCUMENT':
+      // CPF: 11 dígitos ou CNPJ: 14 dígitos
+      return /^\d{11}$|^\d{14}$/.test(key);
+
+    case 'EMAIL':
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(key);
+
+    case 'PHONE':
+      // Formato: +5511999999999 (DDI + DDD + número)
+      return /^55\d{10,11}$/.test(key);
+
+    case 'RANDOM':
+      // UUID formato: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key);
+
+    default:
+      return false;
+  }
+}
+```
+
+## Verificação de Saldo
+
+<Warning>
+  Sempre verifique o saldo antes de realizar pagamentos para evitar erros 400.
+</Warning>
+
+```typescript
+async function safePayment(
+  token: string,
+  amount: number,
+  recipient: RecipientData
+) {
+  // Consultar saldo
+  const balance = await getBalance(token);
+
+  // Verificar se há saldo suficiente
+  if (balance.netBalance < amount) {
+    throw new Error(
+      `Saldo insuficiente. Disponível: R$ ${balance.netBalance.toFixed(2)} | ` +
+      `Necessário: R$ ${amount.toFixed(2)}`
+    );
+  }
+
+  // Prosseguir com pagamento
+  return await sendPixPayment(token, ...recipient, amount);
+}
+```
+
+## Monitoramento de Status
+
+Para acompanhar a confirmação do pagamento:
+
+```javascript
+async function monitorPaymentStatus(transactionId, timeout = 60000) {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeout) {
+    const status = await checkTransactionStatus(transactionId);
+
+    if (status === 'CONFIRMED') {
+      console.log('Pagamento confirmado!');
+      return true;
+    }
+
+    if (status === 'ERROR') {
+      throw new Error('Pagamento falhou');
+    }
+
+    // Aguardar 2 segundos antes de verificar novamente
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+
+  throw new Error('Timeout: Pagamento não confirmado no tempo esperado');
+}
+```
+
+## Códigos de Resposta
+
+| Código | Descrição | Significado |
+|--------|-----------|-------------|
+| `201` | Pagamento Iniciado | Transferência PIX iniciada com sucesso |
+| `400` | Saldo Insuficiente | Saldo insuficiente para realizar a transação |
+| `400` | Dados Inválidos | Verifique os campos obrigatórios e formatos |
+| `401` | Token Inválido | Token não fornecido, expirado ou inválido |
+
+<Info>
+  Consulte a [Referência da API](/api-reference/endpoints/pix-cash-out) para detalhes completos dos campos de resposta.
+</Info>
+
+## Boas Práticas
+
+<AccordionGroup>
+  <Accordion title="Sempre verifique o saldo antes">
+    Consulte o saldo disponível antes de realizar pagamentos para evitar erros.
+  </Accordion>
+
+  <Accordion title="Use externalId único e rastreável">
+    Facilita a conciliação e o rastreamento de pagamentos: `PAY-{timestamp}-{uuid}`
+  </Accordion>
+
+  <Accordion title="Valide dados do destinatário">
+    Implemente validação local de chaves PIX e documentos antes de enviar a requisição.
+  </Accordion>
+
+  <Accordion title="Implemente retry logic">
+    Em caso de falhas temporárias, implemente lógica de retry com backoff exponencial.
+
+    ```javascript
+    async function retryPayment(paymentFn, maxRetries = 3) {
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          return await paymentFn();
+        } catch (error) {
+          if (i === maxRetries - 1) throw error;
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
+        }
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Registre todas as transações">
+    Mantenha um log completo de todas as tentativas de pagamento para auditoria.
+  </Accordion>
+</AccordionGroup>
+
+## Observações Importantes
+
+- **Valor mínimo:** R$ 0,01
+
+## Próximos Passos
+
+<CardGroup cols={2}>
+  <Card title="Pagar via QR Code" icon="qrcode" href="/api-reference/guides/pix-cash-out-qrcode">
+    Realize pagamentos escaneando QR Codes PIX
+  </Card>
+  <Card title="Consultar Saldo" icon="wallet" href="/api-reference/guides/balance">
+    Verifique o saldo antes de realizar pagamentos
+  </Card>
+  <Card title="Gerar Cobrança PIX" icon="qrcode" href="/api-reference/guides/pix-cash-in">
+    Receba pagamentos via PIX
+  </Card>
+</CardGroup>
