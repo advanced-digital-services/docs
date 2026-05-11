@@ -1,0 +1,630 @@
+---
+title: 'PIX Cash-Out via QR Code'
+description: 'Como realizar pagamentos PIX escaneando QR Codes'
+---
+
+## Visão Geral
+
+O endpoint **PIX Cash-Out via QR Code** permite que você realize pagamentos PIX a partir de um QR Code escaneado ou copiado (copia-e-cola). O QR Code deve seguir o padrão EMV do Banco Central do Brasil. Os dados do destinatário são extraídos automaticamente do QR Code, simplificando o processo de pagamento.
+
+<Info>
+  Este endpoint requer um token Bearer válido. Verifique a [documentação de autenticação](/api-reference/guides/authentication) para mais detalhes.
+</Info>
+
+## Chave PIX vs QR Code: Qual endpoint usar?
+
+A API Avista oferece dois endpoints para enviar pagamentos PIX. Escolha o mais adequado para o seu caso de uso:
+
+| Critério | Cash-Out por Chave PIX | Cash-Out via QR Code |
+|----------|------------------------|----------------------|
+| **Endpoint** | `POST /api/pix/cash-out` | `POST /api/pix/cash-out-qrcode` |
+| **Quando usar** | Você conhece a chave PIX do destinatário | Você tem o QR Code gerado pelo recebedor |
+| **Dados do destinatário** | Obrigatórios (chave, tipo, nome, documento) | Embutidos no QR Code (opcionais no request) |
+| **Validação de valor** | Apenas saldo e limites | Saldo, limites + valor do QR Code vs valor informado |
+| **Tipos de chave** | CPF, CNPJ, email, telefone, aleatória | N/A (informação dentro do QR Code) |
+| **Webhook de confirmação** | Evento `CashOut` | Mesmo evento `CashOut` |
+| **Resposta** | Mesma estrutura | Mesma estrutura |
+
+- **Use Cash-Out por Chave** quando sua aplicação já tem os dados do destinatário (ex: folha de pagamento, repasses programáticos)
+- **Use Cash-Out via QR Code** quando o pagamento é iniciado a partir de um QR Code escaneado (ex: PDV, pagamento de conta, copia-e-cola)
+
+<Info>
+  Ambos os endpoints retornam a mesma estrutura de resposta e disparam o mesmo webhook `CashOut` quando confirmados.
+</Info>
+
+## Características
+
+- Pagamento via QR Code estático ou dinâmico
+- Validação automática de valor embutido no QR Code
+- Verificação de saldo automática antes do envio
+- Identificação única por `externalId` (idempotência)
+- Cálculo automático de taxas
+
+## Endpoint
+
+### POST /api/pix/cash-out-qrcode
+
+Realiza um pagamento PIX a partir de um QR Code.
+
+#### Headers Obrigatórios
+
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+#### Request Body
+
+```json
+{
+  "value": 15.50,
+  "qrCode": "00020126580014br.gov.bcb.pix0136a1b2c3d4-e5f6-7890-abcd-ef1234567890520400005303986540515.505802BR5925DESTINATARIO LTDA6009SAO PAULO62070503***6304ABCD",
+  "externalId": "QRPAY-987654-20240119",
+  "description": "Pagamento fornecedor XYZ via QR Code",
+  "name": "Destinatario Ltda",
+  "document": "12345678000190"
+}
+```
+
+#### Request
+
+```bash
+curl -X POST https://api.avista.global/api/pix/cash-out-qrcode \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "value": 15.50,
+    "qrCode": "00020126580014br.gov.bcb.pix0136a1b2c3d4-e5f6-7890-abcd-ef1234567890520400005303986540515.505802BR5925DESTINATARIO LTDA6009SAO PAULO62070503***6304ABCD",
+    "externalId": "QRPAY-987654-20240119",
+    "description": "Pagamento fornecedor XYZ via QR Code",
+    "name": "Destinatario Ltda",
+    "document": "12345678000190"
+  }'
+```
+
+#### Response (201 Created)
+
+```json
+{
+  "transactionId": "456",
+  "externalId": "QRPAY-987654-20240119",
+  "status": "PENDING",
+  "generateTime": "2024-01-19T14:30:00.000Z"
+}
+```
+
+## Parâmetros da Requisição
+
+<ParamField path="value" type="number" required>
+  Valor do pagamento em reais (BRL). Deve ter no máximo 2 casas decimais. Se o QR Code contiver um valor embutido, o valor informado deve corresponder (tolerância de 1 centavo).
+
+  **Mínimo:** `0.01`
+
+  **Exemplo:** `15.50`
+</ParamField>
+
+<ParamField path="qrCode" type="string" required>
+  Conteúdo do QR Code PIX (string EMV). Pode ser obtido via escaneamento de câmera ou pelo campo copia-e-cola.
+
+  **Mínimo:** 50 caracteres
+
+  **Máximo:** 500 caracteres
+
+  **Formato:** Deve iniciar com `000201` (padrão EMV PIX do Banco Central)
+
+  **Exemplo:** `"00020126580014br.gov.bcb.pix0136a1b2c3d4-e5f6-7890-abcd-ef1234567890520400005303986540515.505802BR5925DESTINATARIO LTDA6009SAO PAULO62070503***6304ABCD"`
+</ParamField>
+
+<ParamField path="externalId" type="string" required>
+  Identificador externo único da transação. Garante idempotência — enviar o mesmo `externalId` duas vezes resulta em erro 409.
+
+  **Máximo:** 255 caracteres
+
+  **Recomendação:** Use um formato que garanta unicidade
+
+  **Exemplo:** `"QRPAY-987654-20240119"`
+</ParamField>
+
+<ParamField path="description" type="string">
+  Descrição do pagamento que aparecerá no extrato do destinatário.
+
+  **Máximo:** 140 caracteres
+
+  **Padrão:** Vazio
+
+  **Exemplo:** `"Pagamento fornecedor XYZ via QR Code"`
+</ParamField>
+
+<ParamField path="name" type="string">
+  Nome do destinatário. Opcional — quando omitido, os dados do QR Code são utilizados.
+
+  **Exemplo:** `"Destinatario Ltda"`
+</ParamField>
+
+<ParamField path="document" type="string">
+  CPF ou CNPJ do destinatário (apenas números). Opcional — quando omitido, os dados do QR Code são utilizados.
+
+  **CPF:** 11 dígitos
+
+  **CNPJ:** 14 dígitos
+
+  **Exemplo:** `"12345678000190"`
+</ParamField>
+
+## Estrutura da Resposta
+
+<ResponseField name="transactionId" type="string" required>
+  ID interno da transação gerada pela Avista.
+
+  **Exemplo:** `"456"`
+</ResponseField>
+
+<ResponseField name="externalId" type="string" required>
+  ID externo fornecido na requisição (mesmo valor do input).
+
+  **Exemplo:** `"QRPAY-987654-20240119"`
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Status atual da transação.
+
+  **Valores possíveis:**
+  - `PENDING`: Pagamento em processamento
+  - `CONFIRMED`: Pagamento confirmado e finalizado
+  - `ERROR`: Erro no processamento
+
+  **Exemplo:** `"PENDING"`
+
+  **Nota:** A maioria dos pagamentos PIX é confirmada em poucos segundos
+</ResponseField>
+
+<ResponseField name="generateTime" type="string" required>
+  Data e hora de criação do pagamento (ISO 8601 UTC).
+
+  **Exemplo:** `"2024-01-19T14:30:00.000Z"`
+</ResponseField>
+
+## Exemplos de Implementação
+
+### Node.js / TypeScript
+
+```typescript
+import axios from 'axios';
+
+interface CashOutQrCodeRequest {
+  value: number;
+  qrCode: string;
+  externalId: string;
+  description?: string;
+  name?: string;
+  document?: string;
+}
+
+interface CashOutQrCodeResponse {
+  transactionId: string;
+  externalId: string;
+  status: 'PENDING' | 'CONFIRMED' | 'ERROR';
+  generateTime: string;
+}
+
+async function payWithQrCode(
+  token: string,
+  qrCode: string,
+  amount: number,
+  description?: string
+): Promise<CashOutQrCodeResponse> {
+  const payload: CashOutQrCodeRequest = {
+    value: amount,
+    qrCode,
+    externalId: `QRPAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    description: description || 'Pagamento via QR Code PIX'
+  };
+
+  try {
+    const response = await axios.post<CashOutQrCodeResponse>(
+      'https://api.avista.global/api/pix/cash-out-qrcode',
+      payload,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    console.log('Pagamento via QR Code iniciado!');
+    console.log(`ID da Transação: ${response.data.transactionId}`);
+    console.log(`Status: ${response.data.status}`);
+    console.log(`Valor: R$ ${amount.toFixed(2)}`);
+
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorData = error.response?.data;
+      console.error('Erro ao realizar pagamento:', errorData);
+
+      if (error.response?.status === 400) {
+        if (errorData?.code === 'INVALID_QR_CODE') {
+          throw new Error('QR Code inválido ou malformado');
+        }
+        if (errorData?.code === 'QR_CODE_VALUE_MISMATCH') {
+          throw new Error('Valor informado diverge do valor no QR Code');
+        }
+        if (errorData?.code === 'INSUFFICIENT_BALANCE') {
+          throw new Error('Saldo insuficiente para realizar o pagamento');
+        }
+        throw new Error('Dados inválidos: ' + errorData?.message);
+      }
+
+      if (error.response?.status === 409) {
+        throw new Error('externalId já utilizado em outra transação');
+      }
+
+      throw new Error(errorData?.message || 'Erro ao realizar pagamento via QR Code');
+    }
+    throw error;
+  }
+}
+
+// Uso - Pagamento via QR Code escaneado
+const qrCodeContent = '00020126580014br.gov.bcb.pix0136a1b2c3d4...6304ABCD';
+payWithQrCode('seu_token_aqui', qrCodeContent, 15.50, 'Pagamento fornecedor');
+```
+
+### Python
+
+```python
+import requests
+from datetime import datetime
+from typing import Dict, Optional
+import uuid
+
+def pay_with_qr_code(
+    token: str,
+    qr_code: str,
+    amount: float,
+    description: Optional[str] = None
+) -> Dict:
+    """
+    Envia um pagamento PIX via QR Code
+
+    Args:
+        token: Token Bearer válido
+        qr_code: Conteúdo do QR Code PIX (string EMV)
+        amount: Valor em reais
+        description: Descrição do pagamento (opcional)
+
+    Returns:
+        Dados do pagamento iniciado
+    """
+    url = 'https://api.avista.global/api/pix/cash-out-qrcode'
+
+    payload = {
+        'value': round(amount, 2),
+        'qrCode': qr_code,
+        'externalId': f'QRPAY-{int(datetime.now().timestamp())}-{uuid.uuid4().hex[:8]}',
+        'description': description or 'Pagamento via QR Code PIX'
+    }
+
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+
+        data = response.json()
+
+        print('Pagamento via QR Code iniciado!')
+        print(f"ID da Transação: {data['transactionId']}")
+        print(f"Status: {data['status']}")
+        print(f"Valor: R$ {amount:.2f}")
+
+        return data
+
+    except requests.exceptions.HTTPError as e:
+        error_data = e.response.json() if e.response else {}
+
+        if e.response.status_code == 400:
+            code = error_data.get('code', '')
+            if code == 'INVALID_QR_CODE':
+                raise Exception('QR Code inválido ou malformado')
+            if code == 'QR_CODE_VALUE_MISMATCH':
+                raise Exception('Valor informado diverge do valor no QR Code')
+            if code == 'INSUFFICIENT_BALANCE':
+                raise Exception('Saldo insuficiente para realizar o pagamento')
+            raise Exception(f"Dados inválidos: {error_data.get('message')}")
+
+        if e.response.status_code == 409:
+            raise Exception('externalId já utilizado em outra transação')
+
+        raise Exception(f"Erro ao realizar pagamento: {error_data.get('message', str(e))}")
+
+# Uso
+token = 'seu_token_aqui'
+qr_code = '00020126580014br.gov.bcb.pix0136a1b2c3d4...6304ABCD'
+
+payment = pay_with_qr_code(
+    token=token,
+    qr_code=qr_code,
+    amount=15.50,
+    description='Pagamento fornecedor XYZ via QR Code'
+)
+```
+
+### PHP
+
+```php
+<?php
+
+function payWithQrCode(
+    string $token,
+    string $qrCode,
+    float $amount,
+    ?string $description = null
+): array {
+    $url = 'https://api.avista.global/api/pix/cash-out-qrcode';
+
+    $payload = [
+        'value' => round($amount, 2),
+        'qrCode' => $qrCode,
+        'externalId' => 'QRPAY-' . time() . '-' . bin2hex(random_bytes(4)),
+        'description' => $description ?? 'Pagamento via QR Code PIX'
+    ];
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Authorization: Bearer ' . $token,
+        'Content-Type: application/json'
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode !== 201) {
+        $errorData = json_decode($response, true);
+        $errorCode = $errorData['code'] ?? '';
+        $errorMessage = $errorData['message'] ?? "HTTP $httpCode";
+
+        if ($httpCode === 400) {
+            if ($errorCode === 'INVALID_QR_CODE') {
+                throw new Exception('QR Code inválido ou malformado');
+            }
+            if ($errorCode === 'QR_CODE_VALUE_MISMATCH') {
+                throw new Exception('Valor informado diverge do valor no QR Code');
+            }
+            if ($errorCode === 'INSUFFICIENT_BALANCE') {
+                throw new Exception('Saldo insuficiente para realizar o pagamento');
+            }
+        }
+
+        if ($httpCode === 409) {
+            throw new Exception('externalId já utilizado em outra transação');
+        }
+
+        throw new Exception("Erro ao realizar pagamento: $errorMessage");
+    }
+
+    $data = json_decode($response, true);
+
+    echo "Pagamento via QR Code iniciado!" . PHP_EOL;
+    echo "ID da Transação: {$data['transactionId']}" . PHP_EOL;
+    echo "Status: {$data['status']}" . PHP_EOL;
+    echo "Valor: R$ " . number_format($amount, 2, ',', '.') . PHP_EOL;
+
+    return $data;
+}
+
+// Uso
+$token = 'seu_token_aqui';
+$qrCode = '00020126580014br.gov.bcb.pix0136a1b2c3d4...6304ABCD';
+
+$payment = payWithQrCode($token, $qrCode, 15.50, 'Pagamento fornecedor XYZ');
+```
+
+## Casos de Uso
+
+### 1. PDV — Pagar via QR Code no Caixa
+
+```typescript
+class PointOfSalePayment {
+  constructor(private token: string) {}
+
+  async payFromScannedQrCode(qrCodeContent: string, amount: number) {
+    // Validar QR Code localmente antes de enviar
+    if (!this.isValidPixQrCode(qrCodeContent)) {
+      throw new Error('QR Code inválido. Verifique e tente novamente.');
+    }
+
+    const payment = await payWithQrCode(
+      this.token,
+      qrCodeContent,
+      amount,
+      `Pagamento PDV - ${new Date().toLocaleDateString('pt-BR')}`
+    );
+
+    console.log(`Pagamento iniciado: ${payment.transactionId}`);
+    return payment;
+  }
+
+  private isValidPixQrCode(qrCode: string): boolean {
+    return qrCode.length >= 50 && qrCode.startsWith('000201');
+  }
+}
+```
+
+### 2. Pagamento de Fornecedor via QR Code
+
+```python
+class SupplierPayment:
+    """Processa pagamentos a fornecedores via QR Code"""
+
+    def __init__(self, token: str):
+        self.token = token
+
+    def pay_supplier_invoice(self, qr_code: str, invoice_amount: float, invoice_id: str):
+        """Paga fatura de fornecedor via QR Code"""
+
+        # Verificar saldo antes
+        balance = get_balance(self.token)
+        if balance['netBalance'] < invoice_amount:
+            raise Exception(f"Saldo insuficiente. Disponível: R$ {balance['netBalance']:.2f}")
+
+        payment = pay_with_qr_code(
+            token=self.token,
+            qr_code=qr_code,
+            amount=invoice_amount,
+            description=f'Pagamento fatura #{invoice_id}'
+        )
+
+        return {
+            'invoice_id': invoice_id,
+            'transaction_id': payment['transactionId'],
+            'status': payment['status'],
+            'amount': invoice_amount
+        }
+```
+
+### 3. Automação de Pagamentos Recorrentes
+
+```javascript
+class RecurringQrCodePayment {
+  constructor(token) {
+    this.token = token;
+  }
+
+  async processPaymentBatch(payments) {
+    const results = { successful: [], failed: [] };
+
+    for (const payment of payments) {
+      try {
+        const result = await payWithQrCode(
+          this.token,
+          payment.qrCode,
+          payment.amount,
+          payment.description
+        );
+
+        results.successful.push({
+          reference: payment.reference,
+          transactionId: result.transactionId,
+          amount: payment.amount
+        });
+
+        // Aguardar entre pagamentos
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        results.failed.push({
+          reference: payment.reference,
+          error: error.message
+        });
+      }
+    }
+
+    return results;
+  }
+}
+```
+
+## Validação do QR Code
+
+O QR Code PIX segue o padrão **EMV (Europay, Mastercard, Visa)** definido pelo Banco Central do Brasil. Antes de enviar à API, você pode validar localmente:
+
+```typescript
+function isValidPixQrCode(qrCode: string): boolean {
+  // Verificar tamanho mínimo e máximo
+  if (qrCode.length < 50 || qrCode.length > 500) {
+    return false;
+  }
+
+  // Verificar prefixo EMV obrigatório
+  if (!qrCode.startsWith('000201')) {
+    return false;
+  }
+
+  return true;
+}
+```
+
+**Estrutura do QR Code EMV PIX:**
+- `000201` — Payload Format Indicator (obrigatório)
+- `0102XX` — Point of Initiation Method (`11` = estático, `12` = dinâmico)
+- Campos com dados do recebedor, valor, cidade, etc.
+- `6304XXXX` — CRC16 (checksum de validação)
+
+<Info>
+  A validação completa do QR Code (decodificação EMV, verificação de CRC e extração de dados) é feita automaticamente pela API. A validação local serve apenas para filtrar QR Codes claramente inválidos.
+</Info>
+
+## Códigos de Resposta
+
+| Código | Erro | Descrição |
+|--------|------|-----------|
+| `201` | — | Pagamento PIX via QR Code iniciado com sucesso |
+| `400` | `INVALID_QR_CODE` | QR Code inválido ou malformado |
+| `400` | `QR_CODE_VALUE_MISMATCH` | Valor informado diverge do valor embutido no QR Code |
+| `400` | `INSUFFICIENT_BALANCE` | Saldo insuficiente para realizar a transação |
+| `401` | — | Token não fornecido, expirado ou inválido |
+| `409` | `DUPLICATE_EXTERNAL_ID` | `externalId` já utilizado em outra transação |
+
+<Info>
+  Consulte a [Referência da API](/api-reference/endpoints/pix-cash-out-qrcode) para detalhes completos dos campos de resposta.
+</Info>
+
+## Boas Práticas
+
+<AccordionGroup>
+  <Accordion title="Valide o QR Code localmente antes de enviar">
+    Verifique se a string começa com `000201` e tem pelo menos 50 caracteres. Isso evita chamadas desnecessárias à API para QR Codes claramente inválidos.
+  </Accordion>
+
+  <Accordion title="Verifique o saldo antes de realizar pagamentos">
+    Consulte o saldo disponível antes de enviar o pagamento para evitar erros 400 de saldo insuficiente.
+
+    ```typescript
+    const balance = await getBalance(token);
+    if (balance.netBalance < amount) {
+      throw new Error('Saldo insuficiente');
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Use externalId único e rastreável">
+    Garante idempotência e facilita a conciliação: `QRPAY-{timestamp}-{uuid}`
+
+    Se enviar o mesmo `externalId` duas vezes, receberá erro 409 — evitando pagamentos duplicados.
+  </Accordion>
+
+  <Accordion title="Trate QR Codes dinâmicos corretamente">
+    QR Codes dinâmicos podem não conter valor embutido. Nesse caso, o campo `value` define o valor do pagamento. QR Codes estáticos com valor embutido exigem que o `value` informado corresponda ao valor do QR Code.
+  </Accordion>
+</AccordionGroup>
+
+## Observações Importantes
+
+<Warning>
+  - **Valor mínimo:** R$ 0,01
+  - **Formato do QR Code:** Deve iniciar com `000201` e ter entre 50 e 500 caracteres
+  - **QR Codes dinâmicos:** QR Codes sem valor embutido são aceitos — o campo `value` define o valor do pagamento
+  - **QR Codes estáticos com valor:** O valor informado em `value` deve corresponder ao valor embutido no QR Code (tolerância de 1 centavo)
+</Warning>
+
+## Próximos Passos
+
+<CardGroup cols={2}>
+  <Card title="Cash-Out por Chave PIX" icon="key" href="/api-reference/guides/pix-cash-out">
+    Realize pagamentos informando a chave PIX do destinatário
+  </Card>
+  <Card title="Webhook CashOut" icon="bell" href="/api-reference/guides/webhooks/cash-out">
+    Receba notificações quando o pagamento for confirmado
+  </Card>
+  <Card title="Consultar Saldo" icon="wallet" href="/api-reference/guides/balance">
+    Verifique o saldo antes de realizar pagamentos
+  </Card>
+</CardGroup>
