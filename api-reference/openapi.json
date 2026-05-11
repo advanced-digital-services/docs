@@ -1,0 +1,1650 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Avista Public API",
+    "description": "API Pública da Plataforma Avista para integração com serviços de pagamento PIX e gestão de contas",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "servers": [
+    {
+      "url": "https://api.avista.global",
+      "description": "Servidor de produção"
+    }
+  ],
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Endpoints de autenticação"
+    },
+    {
+      "name": "Balance",
+      "description": "Endpoints de consulta de saldo"
+    },
+    {
+      "name": "PIX",
+      "description": "Endpoints de transações PIX"
+    },
+    {
+      "name": "Webhooks",
+      "description": "Endpoints de gerenciamento de webhooks"
+    }
+  ],
+  "paths": {
+    "/api/auth/token": {
+      "post": {
+        "summary": "Gerar token de acesso JWT",
+        "description": "**Requer certificado de cliente no header X-SSL-Client-Cert**. Autentique usando certificado de cliente X.509 + credenciais OAuth 2.0 (clientId/clientSecret) e receba um token JWT.",
+        "operationId": "AuthController_generateToken",
+        "tags": ["auth"],
+        "parameters": [
+          {
+            "name": "X-SSL-Client-Cert",
+            "in": "header",
+            "description": "Certificado PEM do cliente codificado em URL (header padrão do NGINX)",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "-----BEGIN%20CERTIFICATE-----%0AMIIBkTCB..."
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateTokenInputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Token gerado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateTokenOutputDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requisição inválida ou certificado ausente no header X-SSL-Client-Cert"
+          },
+          "401": {
+            "description": "Credenciais inválidas ou certificado inválido"
+          }
+        }
+      }
+    },
+    "/api/balance": {
+      "get": {
+        "summary": "Consultar saldo da conta",
+        "description": "**Requer token Bearer no header Authorization**. Retorna o saldo bruto, bloqueado e líquido da conta autenticada.",
+        "operationId": "BalanceController_getBalance",
+        "tags": ["Balance"],
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saldo consultado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetBalanceOutputDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token inválido, expirado ou não fornecido"
+          }
+        }
+      }
+    },
+    "/api/pix/cash-in": {
+      "post": {
+        "summary": "Gerar cobrança PIX (Cash-In)",
+        "description": "**Requer token Bearer no header Authorization**. Gera um QR Code dinâmico para recebimento via PIX.",
+        "operationId": "PixController_cashIn",
+        "tags": ["PIX"],
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CashInInputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Cobrança PIX gerada com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashInOutputDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Token não fornecido ou inválido"
+          },
+          "500": {
+            "description": "Erro ao gerar cobrança PIX"
+          }
+        }
+      }
+    },
+    "/api/pix/cash-out": {
+      "post": {
+        "summary": "Realizar pagamento PIX (Cash-Out)",
+        "description": "**Requer token Bearer no header Authorization**. Envia um pagamento PIX para uma chave PIX.",
+        "operationId": "PixController_cashOut",
+        "tags": ["PIX"],
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CashOutInputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pagamento PIX iniciado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashOutOutputDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados inválidos ou saldo insuficiente"
+          },
+          "401": {
+            "description": "Token não fornecido ou inválido"
+          },
+          "500": {
+            "description": "Erro ao processar pagamento PIX"
+          }
+        }
+      }
+    },
+    "/api/pix/cash-out-qrcode": {
+      "post": {
+        "summary": "Realizar pagamento PIX via QR Code (Cash-Out QR Code)",
+        "description": "**Requer token Bearer no header Authorization**. Envia um pagamento PIX a partir de um QR Code escaneado ou copiado (copia-e-cola). O QR Code deve seguir o padrão EMV PIX do Banco Central.",
+        "operationId": "PixController_cashOutQrCode",
+        "tags": ["PIX"],
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CashOutQrCodeInputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pagamento PIX via QR Code iniciado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashOutQrCodeOutputDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados inválidos, QR Code inválido, valor divergente ou saldo insuficiente"
+          },
+          "401": {
+            "description": "Token não fornecido ou inválido"
+          },
+          "409": {
+            "description": "externalId já utilizado em outra transação"
+          },
+          "500": {
+            "description": "Erro ao processar pagamento PIX via QR Code"
+          }
+        }
+      }
+    },
+    "/api/pix/refund-in/{id}": {
+      "post": {
+        "summary": "Solicitar estorno de pagamento recebido (Refund-In)",
+        "description": "**Requer token Bearer no header Authorization**. Solicita a devolução de um pagamento PIX recebido. O estorno pode ser parcial ou total, desde que dentro do prazo de 89 dias.",
+        "operationId": "PixController_refundIn",
+        "tags": ["PIX"],
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID da transação original a ser estornada",
+            "schema": {
+              "type": "string",
+              "example": "123"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundInInputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Solicitação de estorno realizada com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundInOutputDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados inválidos, transação não encontrada, prazo excedido, ou valor inválido"
+          },
+          "401": {
+            "description": "Token não fornecido ou inválido"
+          },
+          "404": {
+            "description": "Transação pai não encontrada"
+          },
+          "500": {
+            "description": "Erro ao processar solicitação de estorno"
+          }
+        }
+      }
+    },
+    "/api/pix/transaction/{id}": {
+      "get": {
+        "summary": "Consultar status de transação",
+        "description": "**Requer token Bearer no header Authorization**. Retorna o status atual de uma transação PIX com informações detalhadas sobre valores, contraparte e timestamps.\n\nO identificador pode ser:\n- **ID numérico**: Identificador interno da transação retornado pela Avista\n- **externalId**: Identificador externo que você forneceu na criação da transação\n\n**Campos retornados:**\n- Informações básicas (id, externalId, type, status)\n- Valores (originalAmount, feeAmount, finalAmount)\n- End-to-end ID do PIX (e2eId)\n- Dados da contraparte (nome, documento, banco)\n- Timestamps (createdAt, updatedAt, processedAt)",
+        "operationId": "PixController_getTransaction",
+        "tags": ["PIX"],
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID da transação (numérico) ou externalId (string)",
+            "schema": {
+              "type": "string",
+              "example": "123"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status da transação retornado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionPollOutputDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token não fornecido ou inválido"
+          },
+          "404": {
+            "description": "Transação não encontrada"
+          }
+        }
+      }
+    },
+    "/api/transactions": {
+      "get": {
+        "summary": "Buscar transações da conta",
+        "description": "**Requer token Bearer no header Authorization**.\n\nRetorna transações da conta autenticada no formato público amigável com paginação.\n\n**Características:**\n- Valores convertidos para reais (2 decimais)\n- Status e tipos mapeados para português\n- Documentos de contraparte mascarados\n- Intervalo máximo de 31 dias entre startDate e endDate\n\n**Mapeamento de Status:**\n- `PENDING` → `Pendente`\n- `CONFIRMED` → `Confirmado`\n- `ERROR` → `Error`\n\n**Mapeamento de Tipos:**\n- `PAYMENT` → `Pix in`\n- `WITHDRAW` → `Pix out`\n- `REFUND_IN` → `Refund in`\n- `REFUND_OUT` → `Refund out`\n\n**Tipo de Movimento:**\n- `Pix in`, `Refund out` → `CREDIT`\n- `Pix out`, `Refund in` → `DEBIT`",
+        "operationId": "TransactionsController_search",
+        "tags": ["PIX"],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Número da página (1-indexed)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "example": 1
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "Quantidade de registros por página (máximo 100)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filtro por status da transação",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["PENDING", "CONFIRMED", "ERROR"],
+              "example": "CONFIRMED"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Filtro por tipo de transação",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["PAYMENT", "WITHDRAW", "REFUND_IN", "REFUND_OUT"],
+              "example": "PAYMENT"
+            }
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "description": "Data inicial para filtro (ISO 8601). Se não informado, usa últimos 31 dias.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2025-01-01"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "description": "Data final para filtro (ISO 8601). Se não informado, usa data atual.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2025-01-31"
+            }
+          },
+          {
+            "name": "externalId",
+            "in": "query",
+            "description": "Filtro por externalId da transação",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "ext-123456"
+            }
+          },
+          {
+            "name": "endToEndId",
+            "in": "query",
+            "description": "Filtro por endToEndId (e2eId) da transação",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "E12345678901234567890123456789012"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de transações retornada com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchTransactionsOutputDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parâmetros inválidos ou intervalo de datas excede 31 dias"
+          },
+          "401": {
+            "description": "Token não fornecido ou inválido"
+          }
+        }
+      }
+    },
+    "/api/pix/transactions/pix-key/{pixKey}": {
+      "get": {
+        "summary": "Listar transações por chave PIX",
+        "description": "**Requer token Bearer no header Authorization**.\n\nRetorna transações associadas a uma chave PIX específica com paginação.\n\n**Características:**\n- Valores convertidos para reais (2 decimais)\n- Status e tipos mapeados para português\n- Documentos de contraparte mascarados\n- Intervalo máximo de **31 dias** entre startDate e endDate\n- Default de `startDate`: últimos **30 dias**\n- Limite máximo de **1000 resultados** totais\n\n**Tipos de chave PIX suportados:** CPF, CNPJ, telefone, e-mail, chave aleatória EVP\n\n**Mapeamento de Status:**\n- `PENDING` → `Pendente`\n- `CONFIRMED` → `Confirmado`\n- `ERROR` → `Error`\n\n**Mapeamento de Tipos:**\n- `PAYMENT` → `Pix in`\n- `WITHDRAW` → `Pix out`\n- `REFUND_IN` → `Refund in`\n- `REFUND_OUT` → `Refund out`",
+        "operationId": "PixController_listTransactionsByPixKey",
+        "tags": ["PIX"],
+        "parameters": [
+          {
+            "name": "pixKey",
+            "required": true,
+            "in": "path",
+            "description": "Chave PIX (CPF, CNPJ, telefone, e-mail ou chave aleatória EVP)",
+            "schema": {
+              "type": "string",
+              "example": "joao@example.com"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Número da página (1-indexed)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "example": 1
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "Quantidade de registros por página (máximo 1000)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 20,
+              "example": 20
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filtro por status da transação",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["PENDING", "CONFIRMED", "ERROR"],
+              "example": "CONFIRMED"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Filtro por tipo de transação",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["PAYMENT", "WITHDRAW", "REFUND_IN", "REFUND_OUT"],
+              "example": "PAYMENT"
+            }
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "description": "Data inicial para filtro (ISO 8601). Se não informado, usa últimos 30 dias.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2025-01-01"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "description": "Data final para filtro (ISO 8601). Se não informado, usa data atual.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2025-01-31"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de transações por chave PIX retornada com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedTransactionsByPixKeyOutputDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parâmetros inválidos ou intervalo de datas excede 31 dias"
+          },
+          "401": {
+            "description": "Token não fornecido ou inválido"
+          }
+        }
+      }
+    },
+    "/api/pix/transactions/pix-key/{pixKey}/{identifier}": {
+      "get": {
+        "summary": "Consultar transação por chave PIX e identificador",
+        "description": "**Requer token Bearer no header Authorization**.\n\nRetorna uma transação específica associada a uma chave PIX, buscando pelo identificador fornecido.\n\n**Lógica de resolução do identificador**:\nO valor informado é comparado simultaneamente contra `endToEndId` (e2eId do PIX), `externalId` e `id` numérico. Na prática não há ambiguidade: o formato de cada tipo é único (e2eId começa com `E` + 32 chars alfanuméricos; id é puramente numérico; externalId é qualquer outra string).",
+        "operationId": "PixController_getTransactionByPixKeyAndIdentifier",
+        "tags": ["PIX"],
+        "parameters": [
+          {
+            "name": "pixKey",
+            "required": true,
+            "in": "path",
+            "description": "Chave PIX (CPF, CNPJ, telefone, e-mail ou chave aleatória EVP)",
+            "schema": {
+              "type": "string",
+              "example": "joao@example.com"
+            }
+          },
+          {
+            "name": "identifier",
+            "required": true,
+            "in": "path",
+            "description": "Identificador da transação: comparado contra endToEndId (e2eId), externalId ou id numérico simultaneamente",
+            "schema": {
+              "type": "string",
+              "example": "E00416968202512121343VX5Sx8fIpkY"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transação encontrada com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionSearchOutputDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token não fornecido ou inválido"
+          },
+          "404": {
+            "description": "Transação não encontrada para a chave PIX e identificador informados"
+          }
+        }
+      }
+    },
+    "/api/webhooks": {
+      "get": {
+        "summary": "Listar webhooks da conta",
+        "description": "**Requer token Bearer no header Authorization**.\n\nRetorna todos os webhooks configurados para a conta autenticada.\n\nCada webhook inclui:\n- **id**: Identificador único do webhook\n- **type**: Tipo do evento (cash_in, cash_out, refund_in, refund_out)\n- **url**: URL do endpoint configurado\n- **headers**: Headers customizados\n- **isActive**: Status do webhook\n- **createdAt**: Data de criação",
+        "operationId": "WebhooksConfigController_listWebhooks",
+        "tags": ["Webhooks"],
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de webhooks da conta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListWebhooksOutputDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token não fornecido ou inválido"
+          },
+          "404": {
+            "description": "Conta não encontrada"
+          }
+        }
+      },
+      "post": {
+        "summary": "Configurar webhook da conta",
+        "description": "**Requer token Bearer no header Authorization**.\n\nConfigura ou atualiza a URL de webhook para um tipo de evento específico. Se já existir um webhook configurado para o mesmo tipo de evento, ele será atualizado (comportamento de upsert).\n\n**Eventos disponíveis:**\n- `cash_in` - PIX recebido\n- `cash_out` - PIX enviado\n- `refund_in` - Estorno de recebimento (devolução solicitada)\n- `refund_out` - Devolução recebida\n\n**Headers personalizados:**\nVocê pode configurar até 5 headers customizados para autenticação do seu endpoint.\nHeaders bloqueados (não permitidos): host, content-length, connection, transfer-encoding, content-type, user-agent.\n\n**Invalidação de cache:**\nAo configurar um webhook, o cache é invalidado automaticamente no serviço de notificações. Transações subsequentes usarão a nova configuração imediatamente.",
+        "operationId": "WebhooksConfigController_setupWebhook",
+        "tags": ["Webhooks"],
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupWebhookInputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook configurado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupWebhookOutputDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados inválidos (URL não é HTTPS, tipo de evento inválido, etc.)"
+          },
+          "401": {
+            "description": "Token não fornecido ou inválido"
+          },
+          "404": {
+            "description": "Conta não encontrada"
+          },
+          "500": {
+            "description": "Erro interno ao configurar webhook"
+          }
+        }
+      }
+    },
+    "/api/resend-webhook/{transactionIdentifier}": {
+      "post": {
+        "summary": "Reenviar webhook de transação",
+        "description": "**Requer token Bearer no header Authorization**.\n\nReenvia o webhook de uma transação específica para a URL configurada ou para uma URL temporária (override).\n\nO identificador da transação pode ser:\n- **ID numérico da transação**: O ID retornado pela Avista (campo `transactionId` nos webhooks)\n- **Seu ID de referência**: O identificador que você forneceu ao criar a transação (externalId)\n- **End-to-End ID do PIX**: O e2eId retornado nos webhooks (formato: E/D + 32 chars)\n\n**Webhook por Tipo de Operação**:\n- Cada tipo de operação (cash_in, cash_out, refund_in, refund_out) pode ter uma URL de webhook diferente\n- O sistema identifica automaticamente o tipo da transação e busca a URL correspondente\n- Se não houver webhook configurado para o tipo específico, retorna erro 400\n\n**Comportamento de URL**:\n- Se `url` for fornecido no body, usa essa URL temporariamente (não persiste)\n- Se `url` não for fornecido, usa a URL configurada no webhook da conta para o tipo da operação\n- Se nenhuma URL estiver disponível, retorna erro 400\n\n**Rate Limiting**: 60 requisições por minuto por conta.",
+        "operationId": "WebhookResendController_resendWebhook",
+        "tags": ["Webhooks"],
+        "parameters": [
+          {
+            "name": "transactionIdentifier",
+            "required": true,
+            "in": "path",
+            "description": "Identificador da transação. Aceita: id numérico, externalId (seu código de referência) ou endToEndId (e2eId do PIX)",
+            "schema": {
+              "type": "string",
+              "example": "abc123-def456-ghi789"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendWebhookInputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook reenviado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendWebhookOutputDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Nenhuma URL de webhook disponível. Configure um webhook para o tipo de operação desta transação ou forneça uma URL temporária no campo 'url'."
+          },
+          "401": {
+            "description": "Token inválido, expirado ou não fornecido"
+          },
+          "404": {
+            "description": "Transação não encontrada ou não pertence à conta autenticada"
+          },
+          "429": {
+            "description": "Rate limit excedido (max 60 req/min)"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Enter JWT token"
+      }
+    },
+    "schemas": {
+      "GenerateTokenInputDto": {
+        "type": "object",
+        "required": ["clientId", "clientSecret"],
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "description": "OAuth 2.0 client ID obtido da criação de credencial",
+            "example": "account-93-550e8400"
+          },
+          "clientSecret": {
+            "type": "string",
+            "description": "OAuth 2.0 client secret (8-64 caracteres)",
+            "example": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+          }
+        }
+      },
+      "GenerateTokenOutputDto": {
+        "type": "object",
+        "required": ["access_token", "token_type", "expires_in"],
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "JWT access token",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "token_type": {
+            "type": "string",
+            "description": "Tipo do token",
+            "example": "Bearer"
+          },
+          "expires_in": {
+            "type": "number",
+            "description": "Tempo de expiração do token em segundos",
+            "example": 1800
+          }
+        }
+      },
+      "GetBalanceOutputDto": {
+        "type": "object",
+        "required": ["grossBalance", "blockedBalance", "netBalance", "consultedAt"],
+        "properties": {
+          "grossBalance": {
+            "type": "number",
+            "description": "Saldo bruto (total disponível + bloqueado)",
+            "example": 48734.9
+          },
+          "blockedBalance": {
+            "type": "number",
+            "description": "Saldo bloqueado (reservado para operações pendentes)",
+            "example": 0
+          },
+          "netBalance": {
+            "type": "number",
+            "description": "Saldo líquido (disponível para uso)",
+            "example": 48734.9
+          },
+          "consultedAt": {
+            "type": "string",
+            "description": "Data e hora da consulta (ISO 8601)",
+            "example": "2025-11-19T20:18:29.384Z"
+          }
+        }
+      },
+      "TransactionDtoClass": {
+        "type": "object",
+        "required": ["value", "description", "externalId"],
+        "properties": {
+          "value": {
+            "type": "number",
+            "description": "Valor da transação em reais (decimal com até 2 casas decimais)",
+            "example": 0.05
+          },
+          "description": {
+            "type": "string",
+            "description": "Descrição da transação",
+            "example": "Cobrança de teste"
+          },
+          "expirationTime": {
+            "type": "number",
+            "description": "Tempo de expiração em segundos (mínimo 5 minutos, máximo 7 dias)",
+            "example": 86400,
+            "default": 86400
+          },
+          "externalId": {
+            "type": "string",
+            "description": "ID externo da transação (identificador único)",
+            "example": "external-teste-01"
+          },
+          "generateQrCode": {
+            "type": "boolean",
+            "description": "Se verdadeiro, retorna o QR Code em Base64 e o código Pix",
+            "example": true,
+            "default": false
+          }
+        }
+      },
+      "PayerDtoClass": {
+        "type": "object",
+        "required": ["fullName", "document"],
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "description": "Nome completo do pagador",
+            "example": "John Marvin"
+          },
+          "document": {
+            "type": "string",
+            "description": "CPF ou CNPJ do pagador (apenas números)",
+            "example": "12312312387"
+          }
+        }
+      },
+      "CashInInputDto": {
+        "type": "object",
+        "required": ["transaction", "payer"],
+        "properties": {
+          "transaction": {
+            "description": "Dados da transação",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransactionDtoClass"
+              }
+            ]
+          },
+          "payer": {
+            "description": "Dados do pagador",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayerDtoClass"
+              }
+            ]
+          },
+          "additionalInfo": {
+            "type": "object",
+            "description": "Informações adicionais (objeto chave-valor string:string, máximo 10 chaves)",
+            "example": {
+              "key1": "value1",
+              "orderId": "ORD-12345"
+            }
+          }
+        }
+      },
+      "CashInOutputDto": {
+        "type": "object",
+        "required": ["transactionId", "correlationId", "externalId", "status", "pixCode", "generateTime", "expirationDate"],
+        "properties": {
+          "transactionId": {
+            "type": "string",
+            "description": "Identificador único da transação gerada",
+            "example": "123"
+          },
+          "correlationId": {
+            "type": "string",
+            "description": "ID de correlação da transação (UUID)",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "ID externo da transação (mesmo valor do input)",
+            "example": "external-teste-01"
+          },
+          "status": {
+            "type": "string",
+            "description": "Status da transação",
+            "enum": ["PENDING", "CONFIRMED", "ERROR"],
+            "example": "PENDING"
+          },
+          "pixCode": {
+            "type": "string",
+            "description": "Código Pix no formato padrão EMV",
+            "example": "00020126580014br.gov.bcb.pix..."
+          },
+          "generateTime": {
+            "type": "string",
+            "description": "Data e hora de geração do Pix (formato ISO 8601)",
+            "example": "2024-01-15T10:30:00.000Z"
+          },
+          "expirationDate": {
+            "type": "string",
+            "description": "Data e hora de expiração do Pix (formato ISO 8601)",
+            "example": "2024-01-16T10:30:00.000Z"
+          },
+          "qrCodeImage": {
+            "type": "string",
+            "description": "QR Code em Base64 (apenas quando generateQrCode=true)",
+            "example": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
+          }
+        }
+      },
+      "PixKeyDetailsDtoClass": {
+        "type": "object",
+        "required": ["key", "keyType", "name", "document"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Chave PIX de destino",
+            "example": "12312312387"
+          },
+          "keyType": {
+            "type": "string",
+            "description": "Tipo da chave PIX",
+            "enum": ["EMAIL", "PHONE", "DOCUMENT", "RANDOM"],
+            "example": "DOCUMENT"
+          },
+          "name": {
+            "type": "string",
+            "description": "Nome do titular da chave PIX",
+            "example": "John Marvin"
+          },
+          "document": {
+            "type": "string",
+            "description": "Documento do titular (CPF ou CNPJ, apenas números)",
+            "example": "12312312387"
+          }
+        }
+      },
+      "CashOutInputDto": {
+        "type": "object",
+        "required": ["value", "details", "externalId"],
+        "properties": {
+          "value": {
+            "type": "number",
+            "description": "Valor da transação em reais (até duas casas decimais)",
+            "example": 15.5
+          },
+          "details": {
+            "description": "Informações da chave PIX de destino",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PixKeyDetailsDtoClass"
+              }
+            ]
+          },
+          "externalId": {
+            "type": "string",
+            "description": "Identificador externo único para a transação",
+            "example": "external-teste-001"
+          },
+          "description": {
+            "type": "string",
+            "description": "Descrição opcional da transação",
+            "example": "Pagamento fornecedor XYZ"
+          }
+        }
+      },
+      "CashOutOutputDto": {
+        "type": "object",
+        "required": ["transactionId", "externalId", "status", "generateTime"],
+        "properties": {
+          "transactionId": {
+            "type": "string",
+            "description": "Identificador interno da transação gerada",
+            "example": "456"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "Identificador externo informado na requisição",
+            "example": "external-teste-001"
+          },
+          "status": {
+            "type": "string",
+            "description": "Status atual da transação",
+            "enum": ["PENDING", "CONFIRMED", "ERROR"],
+            "example": "PENDING"
+          },
+          "generateTime": {
+            "type": "string",
+            "description": "Data/hora de geração da transação (ISO 8601)",
+            "example": "2024-01-15T10:30:00.000Z"
+          }
+        }
+      },
+      "CashOutQrCodeInputDto": {
+        "type": "object",
+        "required": ["value", "qrCode", "externalId"],
+        "properties": {
+          "value": {
+            "type": "number",
+            "description": "Valor do pagamento em reais (até duas casas decimais). Deve corresponder ao valor embutido no QR Code, quando presente.",
+            "example": 15.50
+          },
+          "qrCode": {
+            "type": "string",
+            "description": "Conteúdo do QR Code PIX (string EMV). Mínimo 50 caracteres, máximo 500. Deve iniciar com '000201'.",
+            "minLength": 50,
+            "maxLength": 500,
+            "example": "00020126580014br.gov.bcb.pix0136a1b2c3d4-e5f6-7890-abcd-ef1234567890520400005303986540515.505802BR5925DESTINATARIO LTDA6009SAO PAULO62070503***6304ABCD"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "Identificador externo único para a transação",
+            "example": "QRPAY-987654-20240119"
+          },
+          "description": {
+            "type": "string",
+            "description": "Descrição opcional do pagamento",
+            "example": "Pagamento fornecedor XYZ via QR Code"
+          },
+          "name": {
+            "type": "string",
+            "description": "Nome do destinatário (opcional, pode estar embutido no QR Code)",
+            "example": "Destinatario Ltda"
+          },
+          "document": {
+            "type": "string",
+            "description": "CPF ou CNPJ do destinatário (opcional, pode estar embutido no QR Code)",
+            "example": "12345678000190"
+          }
+        }
+      },
+      "CashOutQrCodeOutputDto": {
+        "type": "object",
+        "required": ["transactionId", "externalId", "status", "generateTime"],
+        "properties": {
+          "transactionId": {
+            "type": "string",
+            "description": "Identificador interno da transação gerada",
+            "example": "456"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "Identificador externo informado na requisição",
+            "example": "QRPAY-987654-20240119"
+          },
+          "status": {
+            "type": "string",
+            "description": "Status atual da transação",
+            "enum": ["PENDING", "CONFIRMED", "ERROR"],
+            "example": "PENDING"
+          },
+          "generateTime": {
+            "type": "string",
+            "description": "Data/hora de geração da transação (ISO 8601)",
+            "example": "2024-01-19T14:30:00.000Z"
+          }
+        }
+      },
+      "RefundInInputDto": {
+        "type": "object",
+        "required": ["refundValue"],
+        "properties": {
+          "refundValue": {
+            "type": "number",
+            "description": "Valor a ser estornado em reais (pode ser parcial). Deve ser menor ou igual ao valor disponível para estorno",
+            "example": 50,
+            "minimum": 0.01
+          },
+          "reason": {
+            "type": "string",
+            "description": "Motivo do estorno (opcional)",
+            "example": "Cliente solicitou devolução"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "ID externo para identificação da devolução. Na API BACEN, corresponde ao parâmetro 'id' da URL",
+            "example": "D123456789"
+          }
+        }
+      },
+      "RefundInOutputDto": {
+        "type": "object",
+        "required": ["transactionId", "externalId", "status", "refundValue", "providerTransactionId", "generateTime"],
+        "properties": {
+          "transactionId": {
+            "type": "string",
+            "description": "ID da transação de estorno gerada",
+            "example": "789"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "ID externo da transação de estorno",
+            "example": "D123456789"
+          },
+          "status": {
+            "type": "string",
+            "description": "Status atual da transação de estorno",
+            "enum": ["PENDING", "CONFIRMED", "ERROR"],
+            "example": "PENDING"
+          },
+          "refundValue": {
+            "type": "number",
+            "description": "Valor do estorno em reais",
+            "example": 50.0
+          },
+          "providerTransactionId": {
+            "type": "string",
+            "description": "ID da transação no provedor (usado para correlação com webhooks)",
+            "example": "7ef4fc3f-a187-495e-857c-e84d70612761"
+          },
+          "generateTime": {
+            "type": "string",
+            "description": "Data/hora de geração da transação de estorno (ISO 8601)",
+            "example": "2024-01-15T10:30:00.000Z"
+          }
+        }
+      },
+      "TransactionPollOutputDto": {
+        "type": "object",
+        "required": ["id", "type", "status", "originalAmount", "feeAmount", "finalAmount", "createdAt", "updatedAt"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID da transação",
+            "example": "123"
+          },
+          "externalId": {
+            "type": "string",
+            "nullable": true,
+            "description": "External ID fornecido pelo cliente",
+            "example": "ext-001"
+          },
+          "type": {
+            "type": "string",
+            "description": "Tipo da transação",
+            "enum": ["PAYMENT", "REFUND_IN", "REFUND_OUT", "WITHDRAW", "TRANSFER"],
+            "example": "PAYMENT"
+          },
+          "status": {
+            "type": "string",
+            "description": "Status da transação",
+            "enum": ["PENDING", "CONFIRMED", "ERROR"],
+            "example": "CONFIRMED"
+          },
+          "originalAmount": {
+            "type": "number",
+            "description": "Valor original em reais",
+            "example": 100
+          },
+          "feeAmount": {
+            "type": "number",
+            "description": "Taxa em reais (até 5 casas decimais)",
+            "example": 0.065
+          },
+          "finalAmount": {
+            "type": "number",
+            "description": "Valor final em reais (original ± taxa, até 5 casas decimais)",
+            "example": 99.935
+          },
+          "e2eId": {
+            "type": "string",
+            "nullable": true,
+            "description": "End-to-end ID do PIX",
+            "example": "E00416968202512121343VX5Sx8fIpkY"
+          },
+          "counterpartName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nome da contraparte",
+            "example": "John Marvin"
+          },
+          "counterpartDocument": {
+            "type": "string",
+            "nullable": true,
+            "description": "Documento da contraparte (CPF/CNPJ)",
+            "example": "12312312387"
+          },
+          "counterpartAccountBankCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Código do banco da contraparte",
+            "example": "001"
+          },
+          "counterpartAccountBranch": {
+            "type": "string",
+            "nullable": true,
+            "description": "Agência da contraparte",
+            "example": "0001"
+          },
+          "counterpartAccountNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "Número da conta da contraparte",
+            "example": "123456-7"
+          },
+          "counterpartAccountIspb": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISPB do banco da contraparte",
+            "example": "00000000"
+          },
+          "counterpartAccountBankName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nome do banco da contraparte",
+            "example": "Banco do Brasil"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Data de criação (ISO 8601)",
+            "example": "2024-01-15T10:30:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Data de atualização (ISO 8601)",
+            "example": "2024-01-15T10:35:00.000Z"
+          },
+          "processedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "Data de processamento (ISO 8601)",
+            "example": "2024-01-15T10:35:00.000Z"
+          }
+        }
+      },
+      "ResendWebhookInputDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL temporária para este reenvio específico. Se não fornecida, usa a URL configurada no webhook da conta. A URL não é persistida.",
+            "example": "https://meu-servidor.com/webhooks/avista"
+          }
+        }
+      },
+      "ResendWebhookOutputDto": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Mensagem descritiva do resultado",
+            "example": "Webhook resent successfully"
+          },
+          "webhookLogId": {
+            "type": "number",
+            "description": "ID do log de webhook gerado para auditoria",
+            "example": 12345
+          },
+          "sentAt": {
+            "type": "string",
+            "description": "Data/hora do envio do webhook (ISO 8601)",
+            "example": "2024-01-15T10:30:00.000Z"
+          },
+          "statusCode": {
+            "type": "number",
+            "description": "Código de status HTTP retornado pela URL de destino",
+            "example": 200
+          }
+        }
+      },
+      "WebhookHeaderDto": {
+        "type": "object",
+        "required": ["key", "value"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Nome do header customizado",
+            "example": "Authorization"
+          },
+          "value": {
+            "type": "string",
+            "description": "Valor do header",
+            "example": "Bearer token123"
+          }
+        }
+      },
+      "SetupWebhookInputDto": {
+        "type": "object",
+        "required": ["url", "eventType"],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL HTTPS do endpoint que receberá os webhooks. Deve usar protocolo HTTPS.",
+            "example": "https://api.example.com/webhooks/pix"
+          },
+          "eventType": {
+            "type": "string",
+            "description": "Tipo de evento para receber notificações",
+            "enum": ["cash_in", "cash_out", "refund_in", "refund_out"],
+            "example": "cash_in"
+          },
+          "headers": {
+            "type": "array",
+            "description": "Headers customizados para autenticação (máximo 5). Headers bloqueados: host, content-length, connection, transfer-encoding, content-type, user-agent",
+            "maxItems": 5,
+            "items": {
+              "$ref": "#/components/schemas/WebhookHeaderDto"
+            },
+            "example": [
+              { "key": "Authorization", "value": "Bearer token123" },
+              { "key": "X-Webhook-Secret", "value": "abc123" }
+            ]
+          }
+        }
+      },
+      "SetupWebhookOutputDto": {
+        "type": "object",
+        "required": ["success", "message"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indica se a operação foi bem-sucedida",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "Mensagem descritiva do resultado",
+            "example": "Webhook configurado com sucesso"
+          }
+        }
+      },
+      "WebhookItemOutputDto": {
+        "type": "object",
+        "required": ["id", "type", "url", "headers", "isActive", "createdAt"],
+        "properties": {
+          "id": {
+            "type": "number",
+            "description": "Identificador único do webhook",
+            "example": 1
+          },
+          "type": {
+            "type": "string",
+            "description": "Tipo do evento (cash_in, cash_out, refund_in, refund_out)",
+            "enum": ["cash_in", "cash_out", "refund_in", "refund_out"],
+            "example": "cash_in"
+          },
+          "url": {
+            "type": "string",
+            "description": "URL do endpoint que recebe os webhooks",
+            "example": "https://api.example.com/webhooks/pix"
+          },
+          "headers": {
+            "type": "object",
+            "description": "Headers customizados configurados (chave-valor)",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "example": {
+              "Authorization": "Bearer token123"
+            }
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Indica se o webhook está ativo",
+            "example": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Data de criação do webhook (ISO 8601)",
+            "example": "2025-01-09T12:00:00.000Z"
+          }
+        }
+      },
+      "CounterpartBankOutputDto": {
+        "type": "object",
+        "properties": {
+          "bankISPB": {
+            "type": "string",
+            "nullable": true,
+            "description": "Código ISPB do banco",
+            "example": "00000000"
+          },
+          "bankName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nome do banco",
+            "example": "Banco do Brasil"
+          },
+          "bankCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Código do banco (COMPE)",
+            "example": "001"
+          },
+          "accountBranch": {
+            "type": "string",
+            "nullable": true,
+            "description": "Agência da conta",
+            "example": "0001"
+          },
+          "accountNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "Número da conta",
+            "example": "123456-7"
+          }
+        }
+      },
+      "CounterpartOutputDto": {
+        "type": "object",
+        "required": ["name", "document", "bank"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Nome da contraparte",
+            "example": "João Silva"
+          },
+          "document": {
+            "type": "string",
+            "description": "Documento mascarado (CPF: ***.XXX.XXX-**, CNPJ: **.XXX.XXX/****-**)",
+            "example": "***.456.789-**"
+          },
+          "bank": {
+            "description": "Dados bancários da contraparte",
+            "$ref": "#/components/schemas/CounterpartBankOutputDto"
+          }
+        }
+      },
+      "TransactionSearchOutputDto": {
+        "type": "object",
+        "required": ["transactionId", "externalId", "status", "operationType", "movementType", "originalAmount", "feeAmount", "finalAmount", "endToEndId", "createdAt", "counterpart"],
+        "properties": {
+          "transactionId": {
+            "type": "string",
+            "description": "ID único da transação",
+            "example": "12345"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "ID externo da transação",
+            "example": "ext-123456"
+          },
+          "status": {
+            "type": "string",
+            "description": "Status da transação (em português)",
+            "enum": ["Confirmado", "Pendente", "Error"],
+            "example": "Confirmado"
+          },
+          "operationType": {
+            "type": "string",
+            "description": "Tipo de operação (em português)",
+            "enum": ["Pix in", "Pix out", "Refund in", "Refund out"],
+            "example": "Pix in"
+          },
+          "movementType": {
+            "type": "string",
+            "description": "Tipo de movimento (DEBIT para saída, CREDIT para entrada)",
+            "enum": ["DEBIT", "CREDIT"],
+            "example": "CREDIT"
+          },
+          "originalAmount": {
+            "type": "number",
+            "description": "Valor original em reais",
+            "example": 100
+          },
+          "feeAmount": {
+            "type": "number",
+            "description": "Valor da taxa em reais (até 5 casas decimais)",
+            "example": 0.065
+          },
+          "finalAmount": {
+            "type": "number",
+            "description": "Valor final em reais (original ± taxa, até 5 casas decimais)",
+            "example": 99.935
+          },
+          "endToEndId": {
+            "type": "string",
+            "description": "End-to-End ID do PIX",
+            "example": "E12345678901234567890123456789012"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Data de criação (ISO 8601)",
+            "example": "2025-01-15T10:30:00.000Z"
+          },
+          "processedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "Data de processamento (ISO 8601)",
+            "example": "2025-01-15T10:30:05.000Z"
+          },
+          "counterpart": {
+            "description": "Dados da contraparte",
+            "$ref": "#/components/schemas/CounterpartOutputDto"
+          }
+        }
+      },
+      "PaginationMetadataOutputDto": {
+        "type": "object",
+        "required": ["page", "size", "total", "totalPages", "hasNext", "hasPrevious"],
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "Página atual",
+            "example": 1
+          },
+          "size": {
+            "type": "integer",
+            "description": "Tamanho da página",
+            "example": 20
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total de registros",
+            "example": 150
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "Total de páginas",
+            "example": 8
+          },
+          "hasNext": {
+            "type": "boolean",
+            "description": "Existe próxima página",
+            "example": true
+          },
+          "hasPrevious": {
+            "type": "boolean",
+            "description": "Existe página anterior",
+            "example": false
+          }
+        }
+      },
+      "SearchTransactionsOutputDto": {
+        "type": "object",
+        "required": ["data", "metadata"],
+        "properties": {
+          "data": {
+            "type": "array",
+            "description": "Lista de transações",
+            "items": {
+              "$ref": "#/components/schemas/TransactionSearchOutputDto"
+            }
+          },
+          "metadata": {
+            "description": "Metadados de paginação",
+            "$ref": "#/components/schemas/PaginationMetadataOutputDto"
+          }
+        }
+      },
+      "ListWebhooksOutputDto": {
+        "type": "object",
+        "required": ["accountId", "webhooks", "total"],
+        "properties": {
+          "accountId": {
+            "type": "number",
+            "description": "ID da conta",
+            "example": 93
+          },
+          "webhooks": {
+            "type": "array",
+            "description": "Lista de webhooks configurados",
+            "items": {
+              "$ref": "#/components/schemas/WebhookItemOutputDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "description": "Total de webhooks configurados",
+            "example": 4
+          }
+        }
+      },
+      "PaginatedTransactionsByPixKeyOutputDto": {
+        "type": "object",
+        "required": ["data", "metadata"],
+        "properties": {
+          "data": {
+            "type": "array",
+            "description": "Lista de transações da chave PIX. O total de resultados é limitado a 1000 registros.",
+            "items": {
+              "$ref": "#/components/schemas/TransactionSearchOutputDto"
+            }
+          },
+          "metadata": {
+            "description": "Metadados de paginação",
+            "$ref": "#/components/schemas/PaginationMetadataOutputDto"
+          }
+        }
+      }
+    }
+  }
+}
