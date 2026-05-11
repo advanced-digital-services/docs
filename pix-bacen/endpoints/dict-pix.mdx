@@ -1,0 +1,352 @@
+---
+title: 'Transferência PIX'
+description: 'Inicie uma transferência PIX para uma chave DICT'
+---
+
+## Visão Geral
+
+O endpoint `POST /dict/pix` inicia uma transferência PIX para a chave informada. A chave pode ser CPF, CNPJ, e-mail, telefone ou EVP (chave aleatória).
+
+<Info>
+  Este endpoint segue a especificação do Banco Central para transferências PIX via DICT (Diretório de Identificadores de Contas Transacionais).
+</Info>
+
+## Endpoint
+
+```
+POST /dict/pix
+```
+
+## Autenticação
+
+<ParamField header="Authorization" type="string" required>
+  Token Bearer obtido via `/oauth/token`.
+</ParamField>
+
+<ParamField header="x-idempotency-key" type="string" required>
+  Identificador único da requisição para suporte a idempotência. Deve ser um UUID v4.
+
+  Exemplo: `550e8400-e29b-41d4-a716-446655440000`
+</ParamField>
+
+## Request Body
+
+<ParamField body="pixKey" type="string" required>
+  Chave PIX de destino. Pode ser:
+  - **CPF**: 11 dígitos numéricos
+  - **CNPJ**: 14 dígitos numéricos
+  - **E-mail**: endereço de e-mail válido
+  - **Telefone**: +55DDDNUMERO (ex: +5511999999999)
+  - **EVP**: Chave aleatória (UUID)
+</ParamField>
+
+<ParamField body="creditorDocument" type="string">
+  Documento do credor (CPF ou CNPJ). Obrigatório quando `priority = HIGH` para validação instantânea.
+</ParamField>
+
+<ParamField body="priority" type="string" default="NORM">
+  Prioridade do processamento:
+  - `HIGH`: Processado instantaneamente (requer `creditorDocument`)
+  - `NORM`: Processamento normal na fila
+</ParamField>
+
+<ParamField body="description" type="string">
+  Mensagem que acompanha a transferência PIX. Será exibida para o destinatário.
+</ParamField>
+
+<ParamField body="paymentFlow" type="string">
+  Fluxo de pagamento (opcional). Utilizado para categorização interna.
+</ParamField>
+
+<ParamField body="expiration" type="number" default={600}>
+  Tempo máximo em segundos que a operação pode permanecer na fila antes de ser cancelada.
+
+  - Mínimo: 1 segundo
+  - Máximo: 10800 segundos (3 horas)
+  - Padrão: 600 segundos (10 minutos)
+</ParamField>
+
+<ParamField body="payment" type="object" required>
+  Dados do pagamento.
+
+  <Expandable title="Propriedades">
+    <ParamField body="currency" type="string" default="BRL">
+      Moeda da transação. Atualmente apenas `BRL` é suportado.
+    </ParamField>
+    <ParamField body="amount" type="number" required>
+      Valor da transferência. **Número** com até 2 casas decimais.
+
+      Exemplo: `100.50`
+
+      <Warning>
+        Diferente do endpoint `/cob`, aqui o valor é **number**, não string.
+      </Warning>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="ispbDeny" type="array">
+  Lista de códigos ISPB para os quais pagamentos não serão permitidos. Útil para bloquear transferências para instituições específicas.
+
+  Exemplo: `["12345678", "87654321"]`
+</ParamField>
+
+## Request
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.avista.global/dict/pix \
+  -H "Authorization: Bearer <token>" \
+  -H "x-idempotency-key: 550e8400-e29b-41d4-a716-446655440000" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pixKey": "12345678909",
+    "creditorDocument": "12345678909",
+    "priority": "NORM",
+    "description": "Pagamento referente a NF 12345",
+    "expiration": 600,
+    "payment": {
+      "currency": "BRL",
+      "amount": 100.50
+    }
+  }'
+```
+
+```typescript Node.js
+const response = await fetch('https://api.avista.global/dict/pix', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'x-idempotency-key': crypto.randomUUID(),
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    pixKey: '12345678909',
+    creditorDocument: '12345678909',
+    priority: 'NORM',
+    description: 'Pagamento referente a NF 12345',
+    expiration: 600,
+    payment: {
+      currency: 'BRL',
+      amount: 100.50,
+    },
+  }),
+});
+
+const transfer = await response.json();
+```
+
+```python Python
+import requests
+import uuid
+
+response = requests.post(
+    'https://api.avista.global/dict/pix',
+    headers={
+        'Authorization': f'Bearer {token}',
+        'x-idempotency-key': str(uuid.uuid4()),
+        'Content-Type': 'application/json',
+    },
+    json={
+        'pixKey': '12345678909',
+        'creditorDocument': '12345678909',
+        'priority': 'NORM',
+        'description': 'Pagamento referente a NF 12345',
+        'expiration': 600,
+        'payment': {
+            'currency': 'BRL',
+            'amount': 100.50,
+        },
+    }
+)
+
+transfer = response.json()
+```
+</CodeGroup>
+
+## Response
+
+<Tabs>
+  <Tab title="200 OK">
+    ```json
+    {
+      "endToEndId": "550e8400-e29b-41d4-a716-446655440000",
+      "eventDate": "2024-01-15T10:30:00.000Z",
+      "id": 12345,
+      "payment": {
+        "amount": 100.50
+      },
+      "type": "PENDING"
+    }
+    ```
+  </Tab>
+  <Tab title="400 Bad Request">
+    ```json
+    {
+      "statusCode": 400,
+      "message": "Chave PIX inválida",
+      "error": "Bad Request"
+    }
+    ```
+  </Tab>
+  <Tab title="422 Unprocessable Entity">
+    ```json
+    {
+      "statusCode": 422,
+      "message": "Chave PIX não encontrada no DICT",
+      "error": "Unprocessable Entity"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Campos da Resposta
+
+<ResponseField name="endToEndId" type="string">
+  Identificador único da transação PIX. O valor real do E2E será enviado no webhook quando a transação for liquidada.
+</ResponseField>
+
+<ResponseField name="eventDate" type="string">
+  Data e hora do evento (ISO 8601).
+</ResponseField>
+
+<ResponseField name="id" type="number">
+  Identificador único da transação.
+</ResponseField>
+
+<ResponseField name="payment" type="object">
+  <Expandable title="Propriedades">
+    <ResponseField name="amount" type="number">
+      Valor da transferência.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="type" type="string">
+  Tipo/status da transação:
+  - `PENDING`: Transferência em processamento
+  - `COMPLETED`: Transferência concluída
+  - `ERROR`: Falha na transferência
+</ResponseField>
+
+## Idempotência
+
+O header `x-idempotency-key` garante que a mesma requisição não seja processada mais de uma vez:
+
+```typescript
+// Mesma idempotency key = mesma resposta
+const key = '550e8400-e29b-41d4-a716-446655440000';
+
+// Primeira chamada - cria a transferência
+const res1 = await createTransfer(key, { amount: 100 });
+// { id: 123, type: 'PENDING' }
+
+// Segunda chamada com mesma key - retorna a mesma transferência
+const res2 = await createTransfer(key, { amount: 100 });
+// { id: 123, type: 'PENDING' } (não cria nova)
+```
+
+<Warning>
+  O `x-idempotency-key` é **obrigatório**. Requisições sem este header serão rejeitadas.
+</Warning>
+
+## Webhook de Transferência
+
+Quando a transferência for processada, você receberá um webhook V2 do tipo `TRANSFER`:
+
+```json
+{
+  "type": "TRANSFER",
+  "data": {
+    "id": 12345,
+    "txId": null,
+    "pixKey": "12345678909",
+    "status": "LIQUIDATED",
+    "payment": {
+      "amount": "100.50",
+      "currency": "BRL"
+    },
+    "endToEndId": "E12345678901234567890123456789012",
+    "creditDebitType": "DEBIT",
+    "idempotencyKey": "550e8400-e29b-41d4-a716-446655440000",
+    "creditorAccount": {
+      "name": "João Silva",
+      "document": "123.xxx.xxx-xx",
+      "ispb": "18236120"
+    },
+    "remittanceInformation": "Pagamento referente a NF 12345"
+  }
+}
+```
+
+<Card title="Webhooks TRANSFER" icon="bell" href="/pix-bacen/webhooks/transfer">
+  Veja a documentação completa do webhook TRANSFER
+</Card>
+
+## Tipos de Chave PIX
+
+| Tipo | Formato | Exemplo |
+|------|---------|---------|
+| CPF | 11 dígitos | `12345678909` |
+| CNPJ | 14 dígitos | `12345678000195` |
+| E-mail | email válido | `joao@email.com` |
+| Telefone | +55DDDNUMERO | `+5511999999999` |
+| EVP | UUID | `7d9f0335-8dcc-4054-9bf9-0dbd61d36906` |
+
+## Prioridade de Processamento
+
+<AccordionGroup>
+  <Accordion title="NORM (Normal)">
+    - Processamento padrão na fila
+    - Menor custo
+    - Tempo de processamento variável
+    - `creditorDocument` opcional
+  </Accordion>
+
+  <Accordion title="HIGH (Alta)">
+    - Processamento instantâneo
+    - Validação imediata do destinatário
+    - `creditorDocument` **obrigatório**
+    - Ideal para pagamentos críticos
+  </Accordion>
+</AccordionGroup>
+
+## Bloqueio de ISPBs
+
+Use `ispbDeny` para bloquear transferências para instituições específicas:
+
+```json
+{
+  "pixKey": "joao@email.com",
+  "payment": { "amount": 100.00 },
+  "ispbDeny": [
+    "12345678",  // Bloquear banco X
+    "87654321"   // Bloquear banco Y
+  ]
+}
+```
+
+Se a chave PIX pertencer a uma instituição bloqueada, a transferência será rejeitada.
+
+## Erros Comuns
+
+| Código | Erro | Solução |
+|--------|------|---------|
+| 400 | Chave PIX inválida | Verifique o formato da chave |
+| 400 | Valor inválido | Use número com até 2 casas decimais |
+| 400 | Idempotency key faltando | Inclua header `x-idempotency-key` |
+| 401 | Token inválido | Renove o token de acesso |
+| 422 | Chave não encontrada | A chave não existe no DICT |
+| 422 | Saldo insuficiente | Verifique o saldo disponível |
+| 422 | ISPB bloqueado | A instituição está na lista `ispbDeny` |
+
+## Próximos Passos
+
+<CardGroup cols={2}>
+  <Card title="Consultar Saldo" icon="wallet" href="/pix-bacen/endpoints/balance">
+    Verifique o saldo disponível
+  </Card>
+  <Card title="Webhook TRANSFER" icon="bell" href="/pix-bacen/webhooks/transfer">
+    Processe notificações de transferência
+  </Card>
+</CardGroup>
