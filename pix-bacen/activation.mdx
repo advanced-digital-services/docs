@@ -1,0 +1,240 @@
+---
+title: 'Ativação'
+description: 'Como ativar o modo PIX Bacen e Webhooks V2 na sua conta'
+---
+
+## Visão Geral
+
+O modo PIX Bacen inclui duas funcionalidades que precisam ser ativadas:
+
+1. **Endpoints BACEN**: Acesso aos endpoints compatíveis com a especificação do Banco Central
+2. **Webhooks V2**: Novo formato de notificações com envelope `{type, data}`
+
+<Warning>
+  A ativação do modo PIX Bacen é uma **breaking change**. Os webhooks passam a usar um formato completamente diferente. Certifique-se de atualizar sua integração antes de solicitar a ativação.
+</Warning>
+
+## Como Solicitar Ativação
+
+### 1. Entre em contato com o suporte
+
+Envie um email para **suporte@avista.global** com:
+
+- Nome da empresa
+- CNPJ
+- Client ID da aplicação
+- Confirmação de que já implementou suporte ao Webhook V2
+
+### 2. Aguarde a configuração
+
+Nossa equipe irá:
+
+1. Ativar o modo PIX Bacen na sua conta
+2. Habilitar os endpoints e o formato de webhook V2
+3. Confirmar a ativação por email
+
+### 3. Teste a integração
+
+Após a ativação:
+
+1. Faça uma cobrança teste via `PUT /cob/:txid`
+2. Verifique se o webhook V2 chegou corretamente
+3. Confirme que sua aplicação processou o novo formato
+
+## O que muda com a ativação?
+
+### Endpoints
+
+Você passa a ter acesso aos endpoints BACEN:
+
+| Antes | Depois |
+|-------|--------|
+| `POST /pix/cash-in` | `PUT /cob/:txid` |
+| `POST /pix/cash-out` | `POST /dict/pix` |
+| `POST /pix/:id/refund` | `PUT /pix/:e2eid/devolucao/:id` |
+| `GET /balance` | `GET /accounts/balances` |
+
+<Info>
+  Os endpoints antigos continuam funcionando. Você pode usar ambas as APIs simultaneamente.
+</Info>
+
+### Webhooks
+
+O formato de webhook muda completamente:
+
+<Tabs>
+  <Tab title="V1 (Antes)">
+    ```json
+    {
+      "event": "CashIn",
+      "status": "CONFIRMED",
+      "transactionId": "12345",
+      "movementType": "CREDIT",
+      "originalAmount": 100.00,
+      "finalAmount": 100.00,
+      "counterpart": {
+        "name": "João Silva",
+        "document": "123.xxx.xxx-xx"
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="V2 (Depois)">
+    ```json
+    {
+      "type": "RECEIVE",
+      "data": {
+        "id": 123,
+        "txId": "abc123",
+        "status": "LIQUIDATED",
+        "payment": {
+          "amount": "100.00",
+          "currency": "BRL"
+        },
+        "creditDebitType": "CREDIT",
+        "debtorAccount": {
+          "name": "João Silva",
+          "document": "123.xxx.xxx-xx"
+        },
+        "creditorAccount": {...}
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Principais diferenças nos Webhooks
+
+| Aspecto | V1 | V2 |
+|---------|----|----|
+| Estrutura | Campos na raiz | Envelope `{type, data}` |
+| Tipo de evento | `event: "CashIn"` | `type: "RECEIVE"` |
+| Status sucesso | `CONFIRMED` | `LIQUIDATED` |
+| Status refund | `CONFIRMED` | `REFUNDED` |
+| Valores | `number` (100.00) | `string` ("100.00") |
+| Contraparte | `counterpart` | `debtorAccount` / `creditorAccount` |
+
+## Preparando sua integração
+
+### 1. Atualize o handler de webhooks
+
+```typescript
+// ANTES (V1)
+function handleWebhookV1(payload: any) {
+  if (payload.event === 'CashIn' && payload.status === 'CONFIRMED') {
+    processPayment(payload.transactionId, payload.finalAmount);
+  }
+}
+
+// DEPOIS (V2)
+function handleWebhookV2(payload: any) {
+  if (payload.type === 'RECEIVE' && payload.data.status === 'LIQUIDATED') {
+    const amount = parseFloat(payload.data.payment.amount);
+    processPayment(payload.data.id, amount);
+  }
+}
+```
+
+### 2. Atualize os tipos/interfaces
+
+```typescript
+// V2 Types
+interface WebhookV2Payload {
+  type: 'RECEIVE' | 'TRANSFER' | 'REFUND';
+  data: WebhookV2Data;
+}
+
+interface WebhookV2Data {
+  id: number;
+  txId: string | null;
+  status: 'PENDING' | 'LIQUIDATED' | 'REFUNDED' | 'ERROR';
+  payment: {
+    amount: string;  // Note: string, não number!
+    currency: string;
+  };
+  creditDebitType: 'CREDIT' | 'DEBIT';
+  debtorAccount: AccountInfo;
+  creditorAccount: AccountInfo;
+  endToEndId: string | null;
+  refunds: RefundInfo[];
+  // ... outros campos
+}
+```
+
+### 3. Teste em ambiente de desenvolvimento
+
+Antes de solicitar a ativação em produção:
+
+1. Solicite ativação no ambiente de sandbox
+2. Execute testes completos de Cash-In, Cash-Out e Refund
+3. Valide que todos os webhooks são processados corretamente
+
+## Rollback
+
+<Warning>
+  Após a ativação, **não é possível voltar para V1** automaticamente. Se precisar reverter, entre em contato com o suporte.
+</Warning>
+
+Recomendamos manter suporte a ambas as versões durante a transição:
+
+```typescript
+function handleWebhook(payload: any) {
+  // Detecta versão pelo formato
+  if (payload.type && payload.data) {
+    return handleWebhookV2(payload);
+  } else if (payload.event) {
+    return handleWebhookV1(payload);
+  }
+  throw new Error('Formato de webhook desconhecido');
+}
+```
+
+## Checklist de Ativação
+
+<Steps>
+  <Step title="Implementar handler V2">
+    Atualize seu código para processar o formato envelope `{type, data}`
+  </Step>
+  <Step title="Testar em sandbox">
+    Solicite ativação em sandbox e execute testes completos
+  </Step>
+  <Step title="Validar todos os eventos">
+    Teste: RECEIVE, TRANSFER, REFUND com status LIQUIDATED, REFUNDED e ERROR
+  </Step>
+  <Step title="Solicitar ativação em produção">
+    Envie email para suporte@avista.global com as informações necessárias
+  </Step>
+  <Step title="Monitorar primeiras transações">
+    Acompanhe as primeiras transações após a ativação para garantir funcionamento
+  </Step>
+</Steps>
+
+## Dúvidas Frequentes
+
+<AccordionGroup>
+  <Accordion title="Posso usar V1 e V2 simultaneamente?">
+    Os **endpoints** podem ser usados simultaneamente (ex: `POST /pix/cash-in` e `PUT /cob/:txid`).
+
+    Os **webhooks** são sempre na versão configurada na conta. Não é possível receber V1 e V2 ao mesmo tempo.
+  </Accordion>
+
+  <Accordion title="O que acontece com transações em andamento?">
+    Transações criadas antes da ativação continuarão enviando webhooks no formato antigo até serem concluídas.
+    Novas transações usarão o formato V2.
+  </Accordion>
+
+  <Accordion title="Preciso mudar a URL do webhook?">
+    Não. A URL permanece a mesma. Apenas o formato do payload muda.
+  </Accordion>
+</AccordionGroup>
+
+## Próximos Passos
+
+<CardGroup cols={2}>
+  <Card title="Webhooks V2" icon="bell" href="/pix-bacen/webhooks/overview">
+    Entenda o novo formato de webhooks
+  </Card>
+  <Card title="Criar Cobrança" icon="qrcode" href="/pix-bacen/endpoints/cob">
+    Use o endpoint BACEN para criar cobranças
+  </Card>
+</CardGroup>
