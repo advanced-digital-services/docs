@@ -1,0 +1,211 @@
+---
+title: 'Configurar Webhooks via API'
+description: 'Configure URLs de webhook programaticamente para receber notificações de eventos PIX'
+---
+
+## Visão Geral
+
+A API de configuração de webhooks permite que você defina programaticamente onde sua aplicação receberá notificações de eventos PIX. Isso elimina a necessidade de contato com o suporte para configurar webhooks.
+
+<Info>
+  Mudanças na configuração de webhooks são aplicadas **imediatamente**.
+  Transações subsequentes usarão a nova URL configurada.
+</Info>
+
+## Endpoint
+
+<Card>
+  **POST** `/api/webhooks`
+</Card>
+
+## Autenticação
+
+Requer token Bearer da conta (Account Token) no header Authorization.
+
+```bash
+Authorization: Bearer {account_token}
+```
+
+<Note>
+  O token deve ser obtido através do endpoint de autenticação usando seu certificado de cliente.
+</Note>
+
+## Parâmetros
+
+<ParamField body="url" type="string" required>
+  URL HTTPS do seu endpoint de webhook.
+
+  **Requisitos:**
+  - Deve usar protocolo HTTPS (HTTP não é aceito)
+  - Deve ser uma URL válida e acessível
+
+  **Exemplo:** `https://api.example.com/webhooks/pix`
+</ParamField>
+
+<ParamField body="eventType" type="string" required>
+  Tipo de evento para receber notificações.
+
+  **Valores possíveis:**
+  - `cash_in` - PIX recebido
+  - `cash_out` - PIX enviado
+  - `refund_in` - Estorno de recebimento (devolução solicitada)
+  - `refund_out` - Devolução recebida
+</ParamField>
+
+<ParamField body="headers" type="array">
+  Headers customizados para autenticação do seu endpoint (máximo 5).
+
+  Cada item deve ter:
+  - `key`: Nome do header
+  - `value`: Valor do header
+
+  **Headers bloqueados (nao permitidos):**
+  - host
+  - content-length
+  - connection
+  - transfer-encoding
+  - content-type
+  - user-agent
+</ParamField>
+
+## Exemplo de Request
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.avista.global/api/webhooks \
+  -H "Authorization: Bearer {account_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://api.example.com/webhooks/pix",
+    "eventType": "cash_in",
+    "headers": [
+      {
+        "key": "Authorization",
+        "value": "Bearer my-secret-token"
+      },
+      {
+        "key": "X-Webhook-Secret",
+        "value": "abc123"
+      }
+    ]
+  }'
+```
+
+```javascript Node.js
+const response = await fetch('https://api.avista.global/api/webhooks', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${accountToken}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    url: 'https://api.example.com/webhooks/pix',
+    eventType: 'cash_in',
+    headers: [
+      { key: 'Authorization', value: 'Bearer my-secret-token' },
+      { key: 'X-Webhook-Secret', value: 'abc123' },
+    ],
+  }),
+});
+
+const data = await response.json();
+console.log(data);
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    'https://api.avista.global/api/webhooks',
+    headers={
+        'Authorization': f'Bearer {account_token}',
+        'Content-Type': 'application/json',
+    },
+    json={
+        'url': 'https://api.example.com/webhooks/pix',
+        'eventType': 'cash_in',
+        'headers': [
+            {'key': 'Authorization', 'value': 'Bearer my-secret-token'},
+            {'key': 'X-Webhook-Secret', 'value': 'abc123'},
+        ],
+    },
+)
+
+print(response.json())
+```
+
+</CodeGroup>
+
+## Exemplo de Response
+
+```json
+{
+  "success": true,
+  "message": "Webhook configurado com sucesso"
+}
+```
+
+## Comportamento de Upsert
+
+Se já existir um webhook configurado para o mesmo `eventType`, ele será **atualizado** com a nova URL e headers. Não é criado um webhook duplicado.
+
+<Warning>
+  Ao atualizar um webhook existente, os headers anteriores são **substituídos** pelos novos.
+  Se você não enviar headers, os headers anteriores serão removidos.
+</Warning>
+
+## Códigos de Erro
+
+| Código | Descrição |
+|--------|-----------|
+| 400 | URL inválida (não é HTTPS), tipo de evento inválido, ou mais de 5 headers |
+| 401 | Token não fornecido ou inválido |
+| 404 | Conta não encontrada |
+| 500 | Erro interno ao configurar webhook |
+
+## Configurando Múltiplos Eventos
+
+Para receber notificações de múltiplos tipos de eventos, faça uma chamada para cada tipo:
+
+```javascript
+const eventTypes = ['cash_in', 'cash_out', 'refund_in', 'refund_out'];
+
+for (const eventType of eventTypes) {
+  await fetch('https://api.avista.global/api/webhooks', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accountToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      url: 'https://api.example.com/webhooks/pix',
+      eventType,
+      headers: [
+        { key: 'X-Webhook-Secret', value: 'abc123' },
+      ],
+    }),
+  });
+}
+```
+
+<Tip>
+  Você pode usar a mesma URL para todos os tipos de evento e diferenciar pelo campo `type` no payload do webhook.
+</Tip>
+
+## Próximos Passos
+
+<CardGroup cols={2}>
+  <Card title="Estrutura do Payload" icon="code" href="/api-reference/guides/webhooks/overview">
+    Entenda a estrutura dos webhooks recebidos
+  </Card>
+  <Card title="Implementacao" icon="terminal" href="/api-reference/guides/webhooks/implementation">
+    Exemplos de codigo para processar webhooks
+  </Card>
+  <Card title="Reenviar Webhook" icon="rotate" href="/api-reference/guides/webhook-resend">
+    Reenvie webhooks perdidos ou para testes
+  </Card>
+  <Card title="Cash-In Webhook" icon="arrow-down" href="/api-reference/guides/webhooks/cash-in">
+    Detalhes do webhook de PIX recebido
+  </Card>
+</CardGroup>
