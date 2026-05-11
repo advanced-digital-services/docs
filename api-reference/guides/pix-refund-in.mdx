@@ -1,0 +1,832 @@
+---
+title: 'PIX Refund-In (Estorno)'
+description: 'Como estornar pagamentos PIX recebidos'
+---
+
+## Visão Geral
+
+O endpoint **PIX Refund-In** permite que você estorne (devolva) pagamentos PIX recebidos através de cobranças geradas via Cash-In. Os estornos podem ser **totais** ou **parciais** e devem ser solicitados dentro do prazo de **89 dias** após o recebimento.
+
+<Info>
+  Este endpoint requer um token Bearer válido. Verifique a [documentação de autenticação](/api-reference/guides/authentication) para mais detalhes.
+</Info>
+
+## Características
+
+- Estornos totais ou parciais
+- Múltiplos estornos parciais da mesma transação
+- Prazo de até 89 dias
+- Processamento instantâneo
+- Rastreamento por motivo do estorno
+
+## Quando Usar Estornos
+
+<CardGroup cols={2}>
+  <Card title="Estorno Total" icon="rotate-left">
+    Devolve 100% do valor recebido ao pagador original.
+
+    **Casos de uso:**
+    - Cancelamento completo do pedido
+    - Produto não enviado
+    - Duplicação de pagamento
+    - Erro no valor cobrado
+  </Card>
+
+  <Card title="Estorno Parcial" icon="percent">
+    Devolve apenas parte do valor recebido.
+
+    **Casos de uso:**
+    - Devolução de itens específicos
+    - Compensação por problemas no produto/serviço
+    - Ajuste de valores
+    - Desconto retroativo
+  </Card>
+</CardGroup>
+
+## Endpoint
+
+### POST /api/pix/refund-in/{id}
+
+Solicita o estorno de um pagamento recebido.
+
+#### Headers Obrigatórios
+
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+#### Path Parameters
+
+<ParamField path="id" type="string" required>
+  ID da transação original (Cash-In) a ser estornada.
+
+  **Exemplo:** `"7845"`
+</ParamField>
+
+#### Request Body
+
+```json
+{
+  "refundValue": 75.00,
+  "reason": "Cliente solicitou devolução de 1 item do pedido"
+}
+```
+
+#### Request
+
+```bash
+curl -X POST https://api.avista.global/api/pix/refund-in/7845 \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "refundValue": 75.00,
+    "reason": "Cliente solicitou devolução de 1 item do pedido"
+  }'
+```
+
+#### Response (201 Created)
+
+```json
+{
+  "transactionId": "7846",
+  "externalId": "D123456789",
+  "status": "PENDING",
+  "refundValue": 75.00,
+  "providerTransactionId": "7ef4fc3f-a187-495e-857c-e84d70612761",
+  "generateTime": "2024-01-19T16:30:00.000Z"
+}
+```
+
+## Parâmetros da Requisição
+
+<ParamField path="refundValue" type="number" required>
+  Valor a ser estornado em reais (BRL). Deve ter no máximo 2 casas decimais.
+
+  **Validações:**
+  - Deve ser maior ou igual a 0.01
+  - Não pode exceder o valor disponível para estorno
+  - Soma de todos os estornos não pode exceder o valor original
+
+  **Exemplo:** `75.00`
+</ParamField>
+
+<ParamField path="reason" type="string">
+  Motivo do estorno (opcional, mas recomendado).
+
+  **Máximo:** 255 caracteres
+
+  **Exemplo:** `"Cliente solicitou devolução de 1 item do pedido"`
+
+  **Recomendação:** Sempre forneça um motivo claro para fins de auditoria
+</ParamField>
+
+<ParamField path="externalId" type="string">
+  ID externo para identificação da devolução (opcional).
+
+  Na API BACEN, corresponde ao parâmetro 'id' da URL.
+
+  **Exemplo:** `"D123456789"`
+</ParamField>
+
+## Estrutura da Resposta
+
+<ResponseField name="transactionId" type="string" required>
+  ID da nova transação de estorno gerada.
+
+  **Exemplo:** `"7846"`
+
+  **Nota:** Este é um ID diferente da transação original
+</ResponseField>
+
+<ResponseField name="externalId" type="string" required>
+  ID externo da transação de estorno.
+
+  **Exemplo:** `"D123456789"`
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Status atual da transação de estorno.
+
+  **Valores possíveis:**
+  - `PENDING`: Estorno em processamento
+  - `CONFIRMED`: Estorno confirmado e finalizado
+  - `ERROR`: Erro no processamento
+
+  **Exemplo:** `"PENDING"`
+</ResponseField>
+
+<ResponseField name="refundValue" type="number" required>
+  Valor do estorno em reais.
+
+  **Exemplo:** `75.00`
+</ResponseField>
+
+<ResponseField name="providerTransactionId" type="string" required>
+  ID da transação no provedor (usado para correlação com webhooks).
+
+  **Exemplo:** `"7ef4fc3f-a187-495e-857c-e84d70612761"`
+</ResponseField>
+
+<ResponseField name="generateTime" type="string" required>
+  Data e hora de geração do estorno (ISO 8601 UTC).
+
+  **Exemplo:** `"2024-01-19T16:30:00.000Z"`
+</ResponseField>
+
+## Exemplos de Implementação
+
+### Node.js / TypeScript
+
+```typescript
+import axios from 'axios';
+
+interface RefundRequest {
+  refundValue: number;
+  reason?: string;
+  externalId?: string;
+}
+
+interface RefundResponse {
+  transactionId: string;
+  externalId: string;
+  status: 'PENDING' | 'CONFIRMED' | 'ERROR';
+  refundValue: number;
+  providerTransactionId: string;
+  generateTime: string;
+}
+
+async function refundPixPayment(
+  token: string,
+  originalTransactionId: string,
+  refundAmount: number,
+  reason?: string
+): Promise<RefundResponse> {
+  const payload: RefundRequest = {
+    refundValue: refundAmount,
+    reason: reason || 'Estorno solicitado pelo cliente'
+  };
+
+  try {
+    const response = await axios.post<RefundResponse>(
+      `https://api.avista.global/api/pix/refund-in/${originalTransactionId}`,
+      payload,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    console.log('Estorno PIX iniciado com sucesso!');
+    console.log(`ID da Transação de Estorno: ${response.data.transactionId}`);
+    console.log(`ID Externo Original: ${response.data.externalId}`);
+    console.log(`Valor do Estorno: R$ ${response.data.refundValue.toFixed(2)}`);
+    console.log(`Status: ${response.data.status}`);
+
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorData = error.response?.data;
+      console.error('Erro ao processar estorno:', errorData);
+
+      // Tratar erros específicos
+      if (error.response?.status === 400) {
+        if (errorData?.message?.includes('prazo excedido')) {
+          throw new Error('Prazo de 89 dias para estorno foi excedido');
+        }
+        if (errorData?.message?.includes('valor inválido')) {
+          throw new Error('Valor do estorno excede o disponível para estorno');
+        }
+      }
+
+      if (error.response?.status === 404) {
+        throw new Error('Transação original não encontrada');
+      }
+
+      throw new Error(errorData?.message || 'Erro ao processar estorno');
+    }
+    throw error;
+  }
+}
+
+// Uso - Estorno Total
+async function fullRefund(token: string, transactionId: string, originalValue: number) {
+  return await refundPixPayment(
+    token,
+    transactionId,
+    originalValue,
+    'Cancelamento total do pedido'
+  );
+}
+
+// Uso - Estorno Parcial
+async function partialRefund(token: string, transactionId: string, itemValue: number) {
+  return await refundPixPayment(
+    token,
+    transactionId,
+    itemValue,
+    'Devolução de 1 item do pedido'
+  );
+}
+
+// Exemplo prático
+const token = 'seu_token_aqui';
+const transactionId = '7845';
+
+// Estornar R$ 75,00 de uma transação de R$ 150,00
+refundPixPayment(token, transactionId, 75.00, 'Cliente solicitou devolução parcial');
+```
+
+### Python
+
+```python
+import requests
+from datetime import datetime
+from typing import Dict, Optional
+
+def refund_pix_payment(
+    token: str,
+    original_transaction_id: str,
+    refund_amount: float,
+    reason: Optional[str] = None
+) -> Dict:
+    """
+    Estorna um pagamento PIX recebido
+
+    Args:
+        token: Token Bearer válido
+        original_transaction_id: ID da transação original (Cash-In)
+        refund_amount: Valor a ser estornado
+        reason: Motivo do estorno (opcional)
+
+    Returns:
+        Dados do estorno criado
+    """
+    url = f'https://api.avista.global/api/pix/refund-in/{original_transaction_id}'
+
+    payload = {
+        'refundValue': round(refund_amount, 2),
+        'reason': reason or 'Estorno solicitado pelo cliente'
+    }
+
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+
+        data = response.json()
+
+        print('Estorno PIX iniciado com sucesso!')
+        print(f"ID da Transação de Estorno: {data['transactionId']}")
+        print(f"ID Externo Original: {data['externalId']}")
+        print(f"Valor do Estorno: R$ {data['refundValue']:.2f}")
+        print(f"Status: {data['status']}")
+
+        return data
+
+    except requests.exceptions.HTTPError as e:
+        error_data = e.response.json() if e.response else {}
+        error_message = error_data.get('message', str(e))
+
+        # Tratar erros específicos
+        if e.response.status_code == 400:
+            if 'prazo excedido' in error_message:
+                raise Exception('Prazo de 89 dias para estorno foi excedido')
+            if 'valor inválido' in error_message:
+                raise Exception('Valor do estorno excede o disponível para estorno')
+            raise Exception(f'Dados inválidos: {error_message}')
+
+        if e.response.status_code == 404:
+            raise Exception('Transação original não encontrada')
+
+        raise Exception(f'Erro ao processar estorno: {error_message}')
+
+# Uso
+token = 'seu_token_aqui'
+transaction_id = '7845'
+
+# Estorno parcial
+refund = refund_pix_payment(
+    token=token,
+    original_transaction_id=transaction_id,
+    refund_amount=75.00,
+    reason='Cliente solicitou devolução de 1 item do pedido'
+)
+
+# Estorno total
+def full_refund(token: str, transaction_id: str, original_value: float):
+    """Realiza estorno total"""
+    return refund_pix_payment(
+        token=token,
+        original_transaction_id=transaction_id,
+        refund_amount=original_value,
+        reason='Cancelamento total do pedido'
+    )
+```
+
+### PHP
+
+```php
+<?php
+
+function refundPixPayment(
+    string $token,
+    string $originalTransactionId,
+    float $refundAmount,
+    ?string $reason = null
+): array {
+    $url = "https://api.avista.global/api/pix/refund-in/$originalTransactionId";
+
+    $payload = [
+        'refundValue' => round($refundAmount, 2),
+        'reason' => $reason ?? 'Estorno solicitado pelo cliente'
+    ];
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Authorization: Bearer ' . $token,
+        'Content-Type: application/json'
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode !== 201) {
+        $errorData = json_decode($response, true);
+        $errorMessage = $errorData['message'] ?? "HTTP $httpCode";
+
+        if ($httpCode === 400) {
+            if (stripos($errorMessage, 'prazo excedido') !== false) {
+                throw new Exception('Prazo de 89 dias para estorno foi excedido');
+            }
+            if (stripos($errorMessage, 'valor inválido') !== false) {
+                throw new Exception('Valor do estorno excede o disponível para estorno');
+            }
+        }
+
+        if ($httpCode === 404) {
+            throw new Exception('Transação original não encontrada');
+        }
+
+        throw new Exception("Erro ao processar estorno: $errorMessage");
+    }
+
+    $data = json_decode($response, true);
+
+    echo "Estorno PIX iniciado com sucesso!" . PHP_EOL;
+    echo "ID da Transação de Estorno: {$data['transactionId']}" . PHP_EOL;
+    echo "ID Externo Original: {$data['externalId']}" . PHP_EOL;
+    echo "Valor do Estorno: R$ " . number_format($data['refundValue'], 2, ',', '.') . PHP_EOL;
+    echo "Status: {$data['status']}" . PHP_EOL;
+
+    return $data;
+}
+
+// Uso
+$token = 'seu_token_aqui';
+$transactionId = '7845';
+
+// Estorno parcial
+$refund = refundPixPayment(
+    $token,
+    $transactionId,
+    75.00,
+    'Cliente solicitou devolução de 1 item do pedido'
+);
+```
+
+## Casos de Uso
+
+### 1. E-commerce - Devolução de Produtos
+
+```typescript
+class OrderRefundSystem {
+  constructor(private token: string) {}
+
+  async processItemReturn(orderId: string, returnedItems: OrderItem[]) {
+    // Buscar transação original do pedido
+    const originalTransaction = await this.getTransactionByOrderId(orderId);
+
+    // Calcular valor total a estornar
+    const refundAmount = returnedItems.reduce(
+      (sum, item) => sum + (item.price * item.quantity),
+      0
+    );
+
+    // Verificar se não excede o valor da transação original
+    const availableForRefund = await this.getAvailableRefundAmount(
+      originalTransaction.id
+    );
+
+    if (refundAmount > availableForRefund) {
+      throw new Error(
+        `Valor solicitado (R$ ${refundAmount.toFixed(2)}) excede o disponível ` +
+        `para estorno (R$ ${availableForRefund.toFixed(2)})`
+      );
+    }
+
+    // Gerar descrição do estorno
+    const itemsDescription = returnedItems
+      .map(item => `${item.name} (${item.quantity}x)`)
+      .join(', ');
+
+    // Realizar estorno
+    const refund = await refundPixPayment(
+      this.token,
+      originalTransaction.id,
+      refundAmount,
+      `Devolução de itens: ${itemsDescription}`
+    );
+
+    // Atualizar status do pedido
+    await this.updateOrderStatus(orderId, 'PARTIALLY_REFUNDED', refund);
+
+    // Notificar cliente
+    await this.notifyCustomerRefund(orderId, refundAmount);
+
+    return refund;
+  }
+
+  async getAvailableRefundAmount(transactionId: string): Promise<number> {
+    // Buscar transação original e todos os estornos já realizados
+    const transaction = await this.getTransaction(transactionId);
+    const existingRefunds = await this.getTransactionRefunds(transactionId);
+
+    const totalRefunded = existingRefunds.reduce(
+      (sum, refund) => sum + refund.value,
+      0
+    );
+
+    return transaction.value - totalRefunded;
+  }
+}
+
+// Uso
+interface OrderItem {
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+const refundSystem = new OrderRefundSystem('seu_token_aqui');
+
+const returnedItems: OrderItem[] = [
+  { name: 'Camiseta Azul', price: 49.90, quantity: 1 }
+];
+
+await refundSystem.processItemReturn('ORDER-12345', returnedItems);
+```
+
+### 2. SaaS - Reembolso Proporcional
+
+```python
+from datetime import datetime, timedelta
+from decimal import Decimal
+
+class SubscriptionRefundManager:
+    """Gerencia reembolsos proporcionais de assinaturas"""
+
+    def __init__(self, token: str):
+        self.token = token
+
+    def calculate_prorated_refund(
+        self,
+        payment_date: datetime,
+        cancellation_date: datetime,
+        monthly_value: float
+    ) -> float:
+        """Calcula reembolso proporcional baseado em dias não utilizados"""
+
+        # Calcular dias da mensalidade (30 dias)
+        billing_period_days = 30
+
+        # Calcular dias utilizados
+        days_used = (cancellation_date - payment_date).days
+
+        # Calcular dias não utilizados
+        days_unused = billing_period_days - days_used
+
+        if days_unused <= 0:
+            return 0.0
+
+        # Calcular valor proporcional
+        daily_rate = Decimal(str(monthly_value)) / Decimal(str(billing_period_days))
+        refund_amount = float(daily_rate * Decimal(str(days_unused)))
+
+        return round(refund_amount, 2)
+
+    def process_subscription_cancellation(
+        self,
+        subscription_id: str,
+        transaction_id: str
+    ) -> dict:
+        """Processa cancelamento com reembolso proporcional"""
+
+        # Buscar dados da assinatura
+        subscription = self.get_subscription(subscription_id)
+
+        # Calcular reembolso proporcional
+        refund_amount = self.calculate_prorated_refund(
+            payment_date=subscription['last_payment_date'],
+            cancellation_date=datetime.now(),
+            monthly_value=subscription['monthly_value']
+        )
+
+        if refund_amount <= 0:
+            return {'refund': None, 'message': 'Sem valor a reembolsar'}
+
+        # Realizar estorno
+        refund = refund_pix_payment(
+            token=self.token,
+            original_transaction_id=transaction_id,
+            refund_amount=refund_amount,
+            reason=f'Cancelamento de assinatura - Reembolso proporcional'
+        )
+
+        # Atualizar status da assinatura
+        self.update_subscription_status(subscription_id, 'CANCELLED')
+
+        return refund
+
+# Uso
+manager = SubscriptionRefundManager('seu_token_aqui')
+
+# Cliente pagou R$ 99,00 no dia 01/01 e cancelou no dia 15/01
+# Reembolso proporcional: 15 dias não utilizados
+refund = manager.process_subscription_cancellation(
+    subscription_id='SUB-12345',
+    transaction_id='7845'
+)
+```
+
+### 3. Marketplace - Compensação por Problemas
+
+```javascript
+class MarketplaceCompensation {
+  constructor(token) {
+    this.token = token;
+  }
+
+  async compensateForIssue(orderId, issueType) {
+    const order = await this.getOrder(orderId);
+    const compensationRules = this.getCompensationRules();
+
+    // Definir valor da compensação baseado no tipo de problema
+    const compensationPercent = compensationRules[issueType] || 0;
+    const compensationAmount = order.value * (compensationPercent / 100);
+
+    if (compensationAmount === 0) {
+      throw new Error('Tipo de problema não elegível para compensação');
+    }
+
+    // Realizar estorno parcial como compensação
+    const refund = await refundPixPayment(
+      this.token,
+      order.transactionId,
+      compensationAmount,
+      `Compensação por ${issueType} - ${compensationPercent}% de desconto`
+    );
+
+    // Registrar compensação
+    await this.recordCompensation(orderId, issueType, compensationAmount);
+
+    return refund;
+  }
+
+  getCompensationRules() {
+    return {
+      'ATRASO_ENTREGA': 10,      // 10% de compensação
+      'PRODUTO_AVARIADO': 20,     // 20% de compensação
+      'ITEM_FALTANTE': 15,        // 15% de compensação
+      'QUALIDADE_INFERIOR': 25    // 25% de compensação
+    };
+  }
+}
+
+// Uso
+const compensation = new MarketplaceCompensation('seu_token_aqui');
+
+// Produto chegou avariado - compensar com 20%
+await compensation.compensateForIssue('ORDER-12345', 'PRODUTO_AVARIADO');
+```
+
+## Validações e Regras de Negócio
+
+### Verificar Valor Disponível para Estorno
+
+```typescript
+async function validateRefundAmount(
+  transactionId: string,
+  requestedAmount: number
+): Promise<boolean> {
+  // Buscar transação original
+  const transaction = await getTransaction(transactionId);
+
+  // Buscar todos os estornos já realizados
+  const refunds = await getRefundsByTransaction(transactionId);
+
+  // Calcular total já estornado
+  const totalRefunded = refunds.reduce((sum, refund) => sum + refund.value, 0);
+
+  // Calcular valor disponível
+  const availableForRefund = transaction.value - totalRefunded;
+
+  // Validar
+  if (requestedAmount > availableForRefund) {
+    throw new Error(
+      `Valor solicitado (R$ ${requestedAmount.toFixed(2)}) excede o disponível ` +
+      `para estorno (R$ ${availableForRefund.toFixed(2)}). ` +
+      `Total já estornado: R$ ${totalRefunded.toFixed(2)}`
+    );
+  }
+
+  return true;
+}
+```
+
+### Verificar Prazo de Estorno
+
+```python
+from datetime import datetime, timedelta
+
+def can_refund_transaction(transaction_date: datetime) -> bool:
+    """Verifica se a transação ainda está dentro do prazo de estorno"""
+    max_refund_days = 89
+    cutoff_date = datetime.now() - timedelta(days=max_refund_days)
+
+    if transaction_date < cutoff_date:
+        days_passed = (datetime.now() - transaction_date).days
+        raise Exception(
+            f'Prazo para estorno excedido. '
+            f'Transação realizada há {days_passed} dias. '
+            f'Prazo máximo: {max_refund_days} dias.'
+        )
+
+    return True
+
+# Uso
+try:
+    can_refund_transaction(datetime(2024, 1, 1))
+    print('Transação pode ser estornada')
+except Exception as e:
+    print(f'Erro: {e}')
+```
+
+## Monitoramento de Estornos
+
+```typescript
+class RefundMonitor {
+  async monitorRefundStatus(refundTransactionId: string, timeout = 60000) {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeout) {
+      const status = await this.checkRefundStatus(refundTransactionId);
+
+      if (status === 'CONFIRMED') {
+        console.log('Estorno confirmado!');
+        await this.onRefundConfirmed(refundTransactionId);
+        return true;
+      }
+
+      if (status === 'ERROR') {
+        await this.onRefundFailed(refundTransactionId);
+        throw new Error('Estorno falhou');
+      }
+
+      // Aguardar 3 segundos antes de verificar novamente
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+
+    throw new Error('Timeout: Estorno não confirmado no tempo esperado');
+  }
+
+  async onRefundConfirmed(refundTransactionId: string) {
+    // Atualizar banco de dados
+    // Notificar cliente
+    // Registrar log
+  }
+
+  async onRefundFailed(refundTransactionId: string) {
+    // Notificar equipe de suporte
+    // Registrar incidente
+    // Criar ticket para análise manual
+  }
+}
+```
+
+## Códigos de Resposta
+
+| Código | Descrição | Significado |
+|--------|-----------|-------------|
+| `201` | Estorno Criado | Estorno PIX iniciado com sucesso |
+| `400` | Valor Inválido | Valor do estorno excede o disponível |
+| `400` | Prazo Excedido | Prazo de 89 dias para estorno foi excedido |
+| `401` | Token Inválido | Token não fornecido, expirado ou inválido |
+| `404` | Transação Não Encontrada | Transação pai não encontrada |
+
+<Info>
+  Consulte a [Referência da API](/api-reference/endpoints/pix-refund-in) para detalhes completos dos campos de resposta.
+</Info>
+
+## Boas Práticas
+
+<AccordionGroup>
+  <Accordion title="Sempre forneça um motivo claro">
+    O motivo do estorno é útil para auditoria e análise de métricas.
+
+    ```javascript
+    // Bom
+    reason: 'Cliente solicitou cancelamento - produto não atendeu expectativas'
+
+    // Ruim
+    reason: 'Cancelado'
+    ```
+  </Accordion>
+
+  <Accordion title="Valide valor disponível antes de estornar">
+    Consulte a transação original e estornos anteriores para evitar erros.
+  </Accordion>
+
+  <Accordion title="Implemente controle de múltiplos estornos">
+    Mantenha registro de todos os estornos para evitar ultrapassar o valor original.
+  </Accordion>
+
+  <Accordion title="Notifique o cliente sobre estornos">
+    Envie email/SMS informando sobre o estorno e prazo para crédito (geralmente instantâneo).
+  </Accordion>
+
+  <Accordion title="Registre todos os estornos para auditoria">
+    Mantenha um log completo com data, valor, motivo e usuário que solicitou o estorno.
+  </Accordion>
+</AccordionGroup>
+
+## Observações Importantes
+
+<Warning>
+  Estornos não podem ser cancelados após iniciados. Certifique-se dos valores antes de processar.
+</Warning>
+
+- **Prazo máximo:** 89 dias após o recebimento
+- **Valor mínimo:** R$ 0,01
+- **Múltiplos estornos:** Permitidos, desde que a soma não exceda o valor original
+
+## Próximos Passos
+
+<CardGroup cols={2}>
+  <Card title="Gerar Cobrança PIX" icon="qrcode" href="/api-reference/guides/pix-cash-in">
+    Crie cobranças para receber pagamentos
+  </Card>
+  <Card title="Consultar Saldo" icon="wallet" href="/api-reference/guides/balance">
+    Verifique o saldo após estornos
+  </Card>
+</CardGroup>
