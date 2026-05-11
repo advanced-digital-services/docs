@@ -1,0 +1,385 @@
+---
+title: 'Consulta de Saldo'
+description: 'Como consultar o saldo da conta em tempo real'
+---
+
+## Visão Geral
+
+O endpoint de consulta de saldo permite que você obtenha informações detalhadas sobre o saldo da conta autenticada em tempo real. A resposta inclui três tipos de saldo:
+
+- **Saldo Bruto (Gross Balance)**: Valor total disponível na conta
+- **Saldo Bloqueado (Blocked Balance)**: Valores reservados para operações pendentes
+- **Saldo Líquido (Net Balance)**: Valor disponível para uso imediato
+
+<Info>
+  Este endpoint requer um token Bearer válido. Verifique a [documentação de autenticação](/api-reference/guides/authentication) para mais detalhes.
+</Info>
+
+## Endpoint
+
+### GET /api/balance
+
+Retorna o saldo atual da conta autenticada.
+
+#### Headers Obrigatórios
+
+```
+Authorization: Bearer {token}
+```
+
+#### Request
+
+```bash
+curl -X GET https://api.avista.global/api/balance \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "grossBalance": 48734.90,
+  "blockedBalance": 0.00,
+  "netBalance": 48734.90,
+  "consultedAt": "2025-11-19T20:18:29.384Z"
+}
+```
+
+## Estrutura da Resposta
+
+<ResponseField name="grossBalance" type="number" required>
+  Saldo bruto total da conta (saldo líquido + saldo bloqueado)
+
+  **Exemplo:** `48734.90`
+</ResponseField>
+
+<ResponseField name="blockedBalance" type="number" required>
+  Valor bloqueado por operações pendentes (pagamentos em processamento, cobranças aguardando confirmação)
+
+  **Exemplo:** `0.00`
+</ResponseField>
+
+<ResponseField name="netBalance" type="number" required>
+  Saldo líquido disponível para uso imediato (grossBalance - blockedBalance)
+
+  **Exemplo:** `48734.90`
+</ResponseField>
+
+<ResponseField name="consultedAt" type="string" required>
+  Data e hora da consulta no formato ISO 8601 (UTC)
+
+  **Exemplo:** `2025-11-19T20:18:29.384Z`
+</ResponseField>
+
+## Exemplos de Implementação
+
+### Node.js / TypeScript
+
+```typescript
+import axios from 'axios';
+
+interface BalanceResponse {
+  grossBalance: number;
+  blockedBalance: number;
+  netBalance: number;
+  consultedAt: string;
+}
+
+async function getBalance(token: string): Promise<BalanceResponse> {
+  try {
+    const response = await axios.get<BalanceResponse>(
+      'https://api.avista.global/api/balance',
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    );
+
+    console.log('=== Saldo da Conta ===');
+    console.log(`Saldo Bruto: R$ ${response.data.grossBalance.toFixed(2)}`);
+    console.log(`Saldo Bloqueado: R$ ${response.data.blockedBalance.toFixed(2)}`);
+    console.log(`Saldo Líquido: R$ ${response.data.netBalance.toFixed(2)}`);
+    console.log(`Consultado em: ${new Date(response.data.consultedAt).toLocaleString('pt-BR')}`);
+
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      console.error('Erro ao consultar saldo:', error.response?.data);
+      throw new Error(error.response?.data?.message || 'Erro ao consultar saldo');
+    }
+    throw error;
+  }
+}
+
+// Uso
+const token = 'seu_token_aqui';
+getBalance(token);
+```
+
+### Python
+
+```python
+import requests
+from datetime import datetime
+from typing import Dict
+
+def get_balance(token: str) -> Dict:
+    """
+    Consulta o saldo da conta
+
+    Args:
+        token: Token Bearer válido
+
+    Returns:
+        Dicionário com informações de saldo
+    """
+    url = 'https://api.avista.global/api/balance'
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+
+        data = response.json()
+
+        print('=== Saldo da Conta ===')
+        print(f"Saldo Bruto: R$ {data['grossBalance']:.2f}")
+        print(f"Saldo Bloqueado: R$ {data['blockedBalance']:.2f}")
+        print(f"Saldo Líquido: R$ {data['netBalance']:.2f}")
+
+        consulted_at = datetime.fromisoformat(data['consultedAt'].replace('Z', '+00:00'))
+        print(f"Consultado em: {consulted_at.strftime('%d/%m/%Y %H:%M:%S')}")
+
+        return data
+
+    except requests.exceptions.RequestException as e:
+        print(f'Erro ao consultar saldo: {e}')
+        if hasattr(e.response, 'json'):
+            print(f'Detalhes: {e.response.json()}')
+        raise
+
+# Uso
+token = 'seu_token_aqui'
+balance = get_balance(token)
+```
+
+### PHP
+
+```php
+<?php
+
+function getBalance(string $token): array
+{
+    $url = 'https://api.avista.global/api/balance';
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Authorization: Bearer ' . $token
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode !== 200) {
+        throw new Exception("Erro ao consultar saldo: HTTP $httpCode");
+    }
+
+    $data = json_decode($response, true);
+
+    echo "=== Saldo da Conta ===" . PHP_EOL;
+    echo "Saldo Bruto: R$ " . number_format($data['grossBalance'], 2, ',', '.') . PHP_EOL;
+    echo "Saldo Bloqueado: R$ " . number_format($data['blockedBalance'], 2, ',', '.') . PHP_EOL;
+    echo "Saldo Líquido: R$ " . number_format($data['netBalance'], 2, ',', '.') . PHP_EOL;
+    echo "Consultado em: " . date('d/m/Y H:i:s', strtotime($data['consultedAt'])) . PHP_EOL;
+
+    return $data;
+}
+
+// Uso
+$token = 'seu_token_aqui';
+$balance = getBalance($token);
+```
+
+## Casos de Uso
+
+### 1. Dashboard de Gestão Financeira
+
+Exiba o saldo em tempo real em um dashboard administrativo:
+
+```javascript
+// Atualizar saldo a cada 30 segundos
+setInterval(async () => {
+  const balance = await getBalance(token);
+
+  // Atualizar UI
+  document.getElementById('gross-balance').textContent =
+    `R$ ${balance.grossBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+
+  document.getElementById('net-balance').textContent =
+    `R$ ${balance.netBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+
+  // Alerta de saldo baixo
+  if (balance.netBalance < 1000) {
+    showLowBalanceAlert();
+  }
+}, 30000);
+```
+
+### 2. Validação Antes de Pagamento
+
+Verifique se há saldo suficiente antes de realizar um pagamento:
+
+```javascript
+async function processPayment(amount: number, token: string) {
+  // Consultar saldo atual
+  const balance = await getBalance(token);
+
+  // Validar saldo disponível
+  if (balance.netBalance < amount) {
+    throw new Error(
+      `Saldo insuficiente. Disponível: R$ ${balance.netBalance.toFixed(2)} | ` +
+      `Necessário: R$ ${amount.toFixed(2)}`
+    );
+  }
+
+  // Prosseguir com pagamento
+  return await createPixPayment(amount, token);
+}
+```
+
+### 3. Relatório de Conciliação
+
+Gere relatórios de conciliação com saldo atual:
+
+```python
+def generate_reconciliation_report(token: str):
+    """Gera relatório de conciliação"""
+    balance = get_balance(token)
+
+    report = {
+        'report_date': datetime.now().isoformat(),
+        'balance_snapshot': balance,
+        'status': 'OK' if balance['netBalance'] > 0 else 'ALERT',
+        'blocked_percentage': (
+            balance['blockedBalance'] / balance['grossBalance'] * 100
+            if balance['grossBalance'] > 0 else 0
+        )
+    }
+
+    # Salvar relatório
+    with open(f"reconciliation_{datetime.now().strftime('%Y%m%d')}.json", 'w') as f:
+        json.dump(report, f, indent=2)
+
+    return report
+```
+
+## Entendendo Saldo Bloqueado
+
+O **saldo bloqueado** representa valores temporariamente indisponíveis devido a:
+
+<AccordionGroup>
+  <Accordion title="Pagamentos PIX em Processamento">
+    Quando você envia um pagamento PIX (seja por chave PIX ou via QR Code), o valor é imediatamente bloqueado até a confirmação da transação.
+
+    **Exemplo:**
+    - Saldo inicial: R$ 1.000,00
+    - Pagamento de R$ 250,00 iniciado
+    - Saldo líquido: R$ 750,00
+    - Saldo bloqueado: R$ 250,00
+  </Accordion>
+
+  <Accordion title="Cobranças Aguardando Confirmação">
+    Cobranças PIX geradas mas ainda não pagas pelos clientes não afetam o saldo bloqueado. O bloqueio ocorre apenas após o pagamento, durante o processamento.
+  </Accordion>
+
+  <Accordion title="Estornos em Análise">
+    Solicitações de estorno podem bloquear temporariamente o valor até a conclusão da análise.
+  </Accordion>
+</AccordionGroup>
+
+## Códigos de Resposta
+
+| Código | Descrição | Significado |
+|--------|-----------|-------------|
+| `200` | Sucesso | Saldo consultado com sucesso |
+| `401` | Token Inválido | Token não fornecido, expirado ou inválido |
+
+<Info>
+  Consulte a [Referência da API](/api-reference/endpoints/get-balance) para detalhes completos dos campos de resposta.
+</Info>
+
+## Considerações
+
+<Warning>
+  O saldo retornado reflete o estado no momento exato da consulta. Para operações críticas, sempre consulte o saldo imediatamente antes da transação.
+</Warning>
+
+- **Cache:** Não recomendamos cache de saldo por mais de 1 minuto
+- **Precisão:** Valores são retornados com 2 casas decimais
+- **Moeda:** Todos os valores são em Reais (BRL)
+
+## Monitoramento e Alertas
+
+### Implementando Alertas de Saldo
+
+```javascript
+class BalanceMonitor {
+  constructor(token, thresholds) {
+    this.token = token;
+    this.thresholds = {
+      critical: thresholds.critical || 500,
+      warning: thresholds.warning || 2000,
+      high: thresholds.high || 10000
+    };
+  }
+
+  async checkAndAlert() {
+    const balance = await getBalance(this.token);
+    const netBalance = balance.netBalance;
+
+    if (netBalance < this.thresholds.critical) {
+      this.sendAlert('CRITICAL', `Saldo crítico: R$ ${netBalance.toFixed(2)}`);
+    } else if (netBalance < this.thresholds.warning) {
+      this.sendAlert('WARNING', `Saldo baixo: R$ ${netBalance.toFixed(2)}`);
+    }
+
+    // Alerta de saldo bloqueado alto
+    const blockedPercentage = (balance.blockedBalance / balance.grossBalance) * 100;
+    if (blockedPercentage > 50) {
+      this.sendAlert('WARNING', `${blockedPercentage.toFixed(1)}% do saldo está bloqueado`);
+    }
+
+    return balance;
+  }
+
+  sendAlert(level, message) {
+    console.log(`[${level}] ${message}`);
+    // Integrar com sistema de alertas (email, SMS, Slack, etc.)
+  }
+}
+
+// Uso
+const monitor = new BalanceMonitor(token, {
+  critical: 1000,
+  warning: 5000
+});
+
+// Executar a cada 5 minutos
+setInterval(() => monitor.checkAndAlert(), 5 * 60 * 1000);
+```
+
+## Próximos Passos
+
+<CardGroup cols={2}>
+  <Card title="Realizar Pagamento PIX" icon="money-bill-transfer" href="/api-reference/guides/pix-cash-out">
+    Envie pagamentos para qualquer chave PIX
+  </Card>
+  <Card title="Gerar Cobrança PIX" icon="qrcode" href="/api-reference/guides/pix-cash-in">
+    Crie cobranças para receber pagamentos
+  </Card>
+</CardGroup>
