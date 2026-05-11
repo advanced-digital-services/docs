@@ -1,0 +1,331 @@
+---
+title: 'Split de Pagamentos'
+description: 'Divida automaticamente pagamentos PIX recebidos entre múltiplos destinatários'
+---
+
+## Visão Geral
+
+O **Split de Pagamentos** permite dividir automaticamente o valor de um PIX recebido (Cash-In) entre múltiplos destinatários. Quando um pagamento é confirmado, o sistema calcula a parte de cada destinatário e executa os envios (PIX-OUT) automaticamente.
+
+<Info>
+  O split é configurado **no momento da criação da cobrança** (Cash-In ou QR Code Estático). Não é possível adicionar splits a uma transação já criada.
+</Info>
+
+## Casos de Uso
+
+<CardGroup cols={2}>
+  <Card title="Marketplace" icon="store">
+    Dividir automaticamente o pagamento entre vendedor e plataforma (comissão).
+  </Card>
+  <Card title="Sociedades" icon="handshake">
+    Distribuir receita entre sócios com percentuais pré-definidos.
+  </Card>
+  <Card title="Franquias" icon="building">
+    Repasse automático de royalties e taxas para a franqueadora.
+  </Card>
+  <Card title="Prestadores de Serviço" icon="user-tie">
+    Repasse automático ao prestador com retenção de taxa da plataforma.
+  </Card>
+</CardGroup>
+
+## Como Funciona
+
+<Steps>
+  <Step title="Crie uma cobrança com splits">
+    Ao gerar um PIX Cash-In, inclua o array `splits` com os destinatários e seus valores (fixo ou percentual).
+  </Step>
+  <Step title="Pagamento é recebido">
+    Quando o pagador efetua o PIX, o webhook `CashIn` é enviado com status `CONFIRMED`.
+  </Step>
+  <Step title="Split é processado">
+    O sistema calcula o valor de cada destinatário (descontando taxas) e cria os itens de split.
+  </Step>
+  <Step title="PIX-OUT é executado">
+    Dependendo da frequência configurada, os valores são enviados automaticamente via PIX para cada destinatário.
+  </Step>
+  <Step title="Confirmação via webhook">
+    Para cada envio, um webhook `CashOut` é disparado com o resultado (sucesso ou falha).
+  </Step>
+</Steps>
+
+## Tipos de Split
+
+### FIXED — Valor Fixo
+
+O destinatário recebe um valor fixo independente do valor total do pagamento.
+
+```json
+{
+  "type": "FIXED",
+  "value": 10.00
+}
+```
+
+<Note>
+  O valor é em **reais** com até 2 casas decimais: `10.00` = R$ 10,00.
+</Note>
+
+### PERCENTAGE — Percentual
+
+O destinatário recebe um percentual do valor bruto do pagamento (antes das taxas).
+
+```json
+{
+  "type": "PERCENTAGE",
+  "value": 10
+}
+```
+
+<Note>
+  O percentual é informado diretamente: `10` = 10%, `25.5` = 25,5%.
+</Note>
+
+## Formato de Valores
+
+Os valores de split usam o **mesmo formato** do campo `transaction.value` — em **reais** com até 2 casas decimais.
+
+### Valores Fixos (FIXED)
+
+| Valor em Reais | Valor no Campo `value` |
+|---|---|
+| R$ 0,01 | `0.01` |
+| R$ 1,00 | `1.00` |
+| R$ 10,00 | `10.00` |
+| R$ 100,00 | `100.00` |
+| R$ 1.500,50 | `1500.50` |
+
+**Mínimo:** `0.01`
+
+### Percentuais (PERCENTAGE)
+
+| Percentual | Valor no Campo `value` |
+|---|---|
+| 1% | `1` |
+| 5% | `5` |
+| 10% | `10` |
+| 25,5% | `25.5` |
+| 33,33% | `33.33` |
+| 50% | `50` |
+
+**O valor representa o percentual diretamente.** Sem multiplicação.
+
+## Frequências de Execução
+
+A frequência determina **quando** os splits acumulados são executados. Ela é configurada por conta, não por transação.
+
+| Frequência | Comportamento |
+|---|---|
+| `IMMEDIATE` | Executado imediatamente após a confirmação do PIX-IN |
+| `HOURLY` | Acumulado e executado a cada hora |
+| `DAILY` | Acumulado e executado uma vez por dia |
+| `WEEKLY` | Acumulado e executado uma vez por semana |
+
+<Info>
+  Quando a frequência é `DAILY` ou `WEEKLY`, os splits de múltiplas transações para o **mesmo destinatário** são agrupados em um único PIX-OUT. Isso reduz custos de transação.
+</Info>
+
+### Campo `immediate` no Split
+
+O campo `immediate` no split individual permite **sobrescrever** a frequência da conta para aquele split específico:
+
+```json
+{
+  "pixKey": "urgente@email.com",
+  "pixKeyType": "EMAIL",
+  "name": "Fornecedor Urgente",
+  "document": "12345678000199",
+  "type": "FIXED",
+  "value": 50.00,
+  "immediate": true
+}
+```
+
+Quando `immediate: true`, o split é executado imediatamente após a confirmação do PIX-IN, mesmo que a conta esteja configurada com frequência `DAILY`.
+
+## Exemplo Completo
+
+### Cenário: Marketplace com 3 destinatários
+
+Um marketplace recebe R$ 100,00 de um cliente. O valor deve ser dividido:
+- **Vendedor**: 70% do valor
+- **Plataforma**: 20% do valor
+- **Entregador**: R$ 10,00 fixo
+
+```json
+{
+  "transaction": {
+    "value": 100.00,
+    "description": "Pedido #12345 - Marketplace",
+    "externalId": "ORDER-12345",
+    "generateQrCode": true
+  },
+  "payer": {
+    "fullName": "Carlos Oliveira",
+    "document": "12345678901"
+  },
+  "splits": [
+    {
+      "pixKey": "vendedor@email.com",
+      "pixKeyType": "EMAIL",
+      "name": "Loja do João",
+      "document": "98765432000188",
+      "type": "PERCENTAGE",
+      "value": 70,
+      "immediate": false
+    },
+    {
+      "pixKey": "plataforma@marketplace.com",
+      "pixKeyType": "EMAIL",
+      "name": "Marketplace Ltda",
+      "document": "11222333000144",
+      "type": "PERCENTAGE",
+      "value": 20,
+      "immediate": false
+    },
+    {
+      "pixKey": "12345678901",
+      "pixKeyType": "CPF",
+      "name": "Entregador Silva",
+      "document": "12345678901",
+      "type": "FIXED",
+      "value": 10.00,
+      "immediate": true
+    }
+  ]
+}
+```
+
+### Resultado após o pagamento (R$ 100,00 recebido):
+
+| Destinatário | Tipo | Cálculo | Valor |
+|---|---|---|---|
+| Vendedor | 70% | R$ 100,00 × 70% | R$ 70,00 |
+| Plataforma | 20% | R$ 100,00 × 20% | R$ 20,00 |
+| Entregador | Fixo | R$ 10,00 | R$ 10,00 |
+| **Total** | | | **R$ 100,00** |
+
+<Note>
+  Quando há taxas da plataforma (fee), o cálculo do percentual é feito sobre o valor **bruto** (antes das taxas). As taxas são descontadas do valor remanescente após os splits.
+</Note>
+
+## Limites e Restrições
+
+| Restrição | Valor |
+|---|---|
+| Máximo de destinatários por transação | 10 |
+| Valor mínimo por split (FIXED) | `0.01` (R$ 0,01) |
+| Percentual mínimo por split | `0.01` (0,01%) |
+| Máximo de casas decimais | 2 |
+| Soma dos splits | Não pode exceder o valor da transação |
+
+<Warning>
+  Se a soma dos splits fixos + percentuais sobre o valor bruto + taxas exceder o valor da transação, a API retornará erro **400 Bad Request**.
+</Warning>
+
+### QR Code Estático sem Valor
+
+Para QR Codes estáticos criados **sem valor definido** (o pagador informa o valor), apenas splits do tipo `PERCENTAGE` são permitidos. Splits `FIXED` serão rejeitados, pois o valor final não é conhecido no momento da criação.
+
+## Webhooks
+
+### PIX-IN Confirmado (com splits)
+
+Quando o pagamento é confirmado, o webhook `CashIn` padrão é enviado. Os splits são processados automaticamente em background.
+
+```json
+{
+  "event": "CashIn",
+  "status": "CONFIRMED",
+  "transactionId": "12345",
+  "externalId": "ORDER-12345",
+  "originalAmount": 100.00,
+  "finalAmount": 99.50,
+  "feeAmount": 0.50
+}
+```
+
+### PIX-OUT do Split (execução)
+
+Para cada destinatário do split, um PIX-OUT é executado e um webhook `CashOut` é enviado:
+
+```json
+{
+  "event": "CashOut",
+  "status": "CONFIRMED",
+  "transactionId": "67890",
+  "externalId": "SPLIT-12345-vendedor",
+  "originalAmount": 70.00,
+  "finalAmount": 70.00,
+  "counterpart": {
+    "name": "Loja do João",
+    "document": "*.765.432/0001-**"
+  }
+}
+```
+
+<Info>
+  Os webhooks de CashOut dos splits seguem o mesmo formato e configuração dos webhooks de Cash-Out normais. Configure seus webhooks em **Configurações → Webhooks** no [painel](https://app.avista.global).
+</Info>
+
+## Boas Práticas
+
+<AccordionGroup>
+  <Accordion title="Use PERCENTAGE para marketplaces">
+    Percentuais se adaptam automaticamente ao valor do pedido. Use `FIXED` apenas para valores que não mudam (ex: taxa de entrega fixa).
+  </Accordion>
+
+  <Accordion title="Configure a frequência adequada">
+    - **IMMEDIATE**: Para pagamentos urgentes (ex: entregadores)
+    - **DAILY**: Para repasses regulares (ex: vendedores de marketplace)
+    - **WEEKLY**: Para comissões e royalties
+  </Accordion>
+
+  <Accordion title="Monitore webhooks de CashOut">
+    Cada split gera um webhook `CashOut` separado. Implemente tratamento de erros para splits que falharem — eles podem ser retentados automaticamente.
+  </Accordion>
+
+  <Accordion title="Valide a soma dos splits antes de enviar">
+    Calcule localmente se a soma dos splits não excede o valor da transação antes de chamar a API. Isso evita erros 400 desnecessários.
+
+    ```javascript
+    function validateSplits(transactionValue, splits) {
+      let fixedTotal = 0;
+      let percentageTotal = 0;
+
+      for (const split of splits) {
+        if (split.type === 'FIXED') {
+          fixedTotal += split.value; // Já em reais
+        } else {
+          percentageTotal += split.value; // Percentual direto
+        }
+      }
+
+      const percentageValue = transactionValue * (percentageTotal / 100);
+      const totalSplit = fixedTotal + percentageValue;
+
+      return totalSplit <= transactionValue;
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Use immediate com moderação">
+    Splits imediatos geram PIX-OUT individuais. Para alto volume, prefira acumulação (`DAILY`) que agrupa múltiplos splits para o mesmo destinatário em um único PIX-OUT.
+  </Accordion>
+</AccordionGroup>
+
+## Próximos Passos
+
+<CardGroup cols={2}>
+  <Card title="PIX Cash-In" icon="qrcode" href="/api-reference/guides/pix-cash-in">
+    Veja como criar cobranças com splits
+  </Card>
+  <Card title="Webhooks" icon="bell" href="/api-reference/guides/webhooks/overview">
+    Configure webhooks para receber notificações dos splits
+  </Card>
+  <Card title="Teste em Sandbox" icon="flask" href="/api-reference/guides/sandbox-testing">
+    Teste cenários de erro e sucesso dos splits em sandbox
+  </Card>
+  <Card title="Buscar Transações" icon="magnifying-glass" href="/api-reference/guides/transactions-search">
+    Consulte o status das transações de split
+  </Card>
+</CardGroup>
