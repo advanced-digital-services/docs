@@ -1,0 +1,473 @@
+---
+title: 'Implementação'
+description: 'Exemplos de código e boas práticas para implementar webhooks'
+---
+
+## Exemplos Completos
+
+<Tabs>
+  <Tab title="Node.js / Express">
+    ```typescript
+    import express from 'express';
+
+    interface PixWebhookPayload {
+      event: 'CashIn' | 'CashOut' | 'CashInReversal' | 'CashOutReversal';
+      status: 'PENDING' | 'CONFIRMED' | 'ERROR';
+      transactionType: 'PIX';
+      movementType: 'CREDIT' | 'DEBIT';
+      transactionId: string;
+      externalId: string | null;
+      endToEndId: string;
+      pixKey: string | null;
+      feeAmount: number;
+      originalAmount: number;
+      finalAmount: number;
+      processingDate: string;
+      errorCode: string | null;
+      errorMessage: string | null;
+      counterpart?: Counterpart;
+      parentTransaction?: ParentTransaction;
+      metadata: Record<string, unknown>;
+    }
+
+    interface Counterpart {
+      name: string;
+      document: string;
+      bank: {
+        bankISPB: string | null;
+        bankName: string | null;
+        bankCode: string | null;
+        accountBranch: string | null;
+        accountNumber: string | null;
+      };
+    }
+
+    interface ParentTransaction {
+      transactionId: string;
+      externalId: string;
+      endToEndId: string;
+      processingDate: string;
+      wasTotalRefunded: boolean;
+      remainingAmountForRefund: number;
+      metadata: Record<string, unknown>;
+      counterpart: Counterpart;
+    }
+
+    const app = express();
+    app.use(express.json());
+
+    // Middleware de autenticação Basic Auth
+    function validateBasicAuth(
+      req: express.Request,
+      res: express.Response,
+      next: express.NextFunction
+    ) {
+      const authHeader = req.headers.authorization;
+
+      if (!authHeader || !authHeader.startsWith('Basic ')) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const base64Credentials = authHeader.split(' ')[1];
+      const credentials = Buffer.from(base64Credentials, 'base64').toString('ascii');
+      const [username, password] = credentials.split(':');
+
+      if (
+        username !== process.env.WEBHOOK_USER ||
+        password !== process.env.WEBHOOK_PASS
+      ) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      next();
+    }
+
+    // Set para controle de idempotência
+    const processedTransactions = new Set<string>();
+
+    app.post('/webhooks/pix', validateBasicAuth, async (req, res) => {
+      const payload: PixWebhookPayload = req.body;
+
+      // Responder rapidamente (webhook exige resposta em até 10s)
+      res.status(200).json({ acknowledged: true });
+
+      // Verificar idempotência
+      if (processedTransactions.has(payload.transactionId)) {
+        console.log(`Transação ${payload.transactionId} já processada`);
+        return;
+      }
+
+      // Marcar como processada
+      processedTransactions.add(payload.transactionId);
+
+      // Processar assincronamente
+      try {
+        switch (payload.event) {
+          case 'CashIn':
+            await handleCashIn(payload);
+            break;
+          case 'CashOut':
+            await handleCashOut(payload);
+            break;
+          case 'CashInReversal':
+            await handleCashInReversal(payload);
+            break;
+          case 'CashOutReversal':
+            await handleCashOutReversal(payload);
+            break;
+        }
+      } catch (error) {
+        console.error(`Erro ao processar ${payload.event}:`, error);
+        processedTransactions.delete(payload.transactionId);
+      }
+    });
+
+    async function handleCashIn(payload: PixWebhookPayload) {
+      console.log(`[CashIn] Recebido: R$ ${payload.finalAmount}`);
+      // await orderService.markAsPaid(payload.externalId);
+    }
+
+    async function handleCashOut(payload: PixWebhookPayload) {
+      console.log(`[CashOut] Enviado: R$ ${payload.originalAmount}`);
+      // await transferService.markAsCompleted(payload.transactionId);
+    }
+
+    async function handleCashInReversal(payload: PixWebhookPayload) {
+      console.log(`[CashInReversal] Estornado: R$ ${payload.originalAmount}`);
+      // await refundService.markAsCompleted(payload.transactionId);
+    }
+
+    async function handleCashOutReversal(payload: PixWebhookPayload) {
+      console.log(`[CashOutReversal] Devolvido: R$ ${payload.finalAmount}`);
+      // await balanceService.credit(payload.finalAmount);
+    }
+
+    app.listen(3000);
+    ```
+  </Tab>
+  <Tab title="Python / Flask">
+    ```python
+    from flask import Flask, request, jsonify
+    from functools import wraps
+    import base64
+    import os
+    from typing import Dict, Any, Optional
+    from dataclasses import dataclass
+
+    app = Flask(__name__)
+    processed_transactions: set = set()
+
+    @dataclass
+    class PixWebhookPayload:
+        event: str
+        status: str
+        transaction_id: str
+        external_id: Optional[str]
+        end_to_end_id: str
+        fee_amount: float
+        original_amount: float
+        final_amount: float
+        counterpart: Optional[Dict[str, Any]]
+        parent_transaction: Optional[Dict[str, Any]]
+
+        @classmethod
+        def from_dict(cls, data: Dict[str, Any]) -> 'PixWebhookPayload':
+            return cls(
+                event=data.get('event'),
+                status=data.get('status'),
+                transaction_id=data.get('transactionId'),
+                external_id=data.get('externalId'),
+                end_to_end_id=data.get('endToEndId'),
+                fee_amount=data.get('feeAmount', 0),
+                original_amount=data.get('originalAmount', 0),
+                final_amount=data.get('finalAmount', 0),
+                counterpart=data.get('counterpart'),
+                parent_transaction=data.get('parentTransaction'),
+            )
+
+
+    def require_basic_auth(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            auth_header = request.headers.get('Authorization')
+
+            if not auth_header or not auth_header.startswith('Basic '):
+                return jsonify({'error': 'Unauthorized'}), 401
+
+            try:
+                credentials = base64.b64decode(
+                    auth_header.split(' ')[1]
+                ).decode('utf-8')
+                username, password = credentials.split(':')
+
+                if (
+                    username != os.environ.get('WEBHOOK_USER') or
+                    password != os.environ.get('WEBHOOK_PASS')
+                ):
+                    return jsonify({'error': 'Invalid credentials'}), 401
+            except Exception:
+                return jsonify({'error': 'Invalid auth header'}), 401
+
+            return f(*args, **kwargs)
+        return decorated
+
+
+    @app.route('/webhooks/pix', methods=['POST'])
+    @require_basic_auth
+    def handle_pix_webhook():
+        data = request.get_json()
+        payload = PixWebhookPayload.from_dict(data)
+
+        # Idempotência
+        if payload.transaction_id in processed_transactions:
+            return jsonify({'acknowledged': True}), 200
+
+        processed_transactions.add(payload.transaction_id)
+
+        # Processar
+        if payload.event == 'CashIn':
+            print(f"[CashIn] R$ {payload.final_amount:.2f}")
+        elif payload.event == 'CashOut':
+            print(f"[CashOut] R$ {payload.original_amount:.2f}")
+        elif payload.event == 'CashInReversal':
+            print(f"[CashInReversal] R$ {payload.original_amount:.2f}")
+        elif payload.event == 'CashOutReversal':
+            print(f"[CashOutReversal] R$ {payload.final_amount:.2f}")
+
+        return jsonify({'acknowledged': True}), 200
+
+
+    if __name__ == '__main__':
+        app.run(host='0.0.0.0', port=3000)
+    ```
+  </Tab>
+  <Tab title="PHP">
+    ```php
+    <?php
+
+    $WEBHOOK_USER = getenv('WEBHOOK_USER') ?: 'avista';
+    $WEBHOOK_PASS = getenv('WEBHOOK_PASS') ?: 'secret';
+    $PROCESSED_FILE = '/tmp/processed_transactions.json';
+
+    function validateBasicAuth($user, $pass): bool {
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+
+        if (empty($authHeader) || !str_starts_with($authHeader, 'Basic ')) {
+            return false;
+        }
+
+        $credentials = base64_decode(substr($authHeader, 6));
+        list($u, $p) = explode(':', $credentials, 2);
+
+        return $u === $user && $p === $pass;
+    }
+
+    function isProcessed($txId): bool {
+        global $PROCESSED_FILE;
+        if (!file_exists($PROCESSED_FILE)) return false;
+        $processed = json_decode(file_get_contents($PROCESSED_FILE), true) ?? [];
+        return in_array($txId, $processed);
+    }
+
+    function markProcessed($txId): void {
+        global $PROCESSED_FILE;
+        $processed = file_exists($PROCESSED_FILE)
+            ? json_decode(file_get_contents($PROCESSED_FILE), true) ?? []
+            : [];
+        $processed[] = $txId;
+        file_put_contents($PROCESSED_FILE, json_encode(array_slice($processed, -10000)));
+    }
+
+    // Validações
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        exit;
+    }
+
+    if (!validateBasicAuth($WEBHOOK_USER, $WEBHOOK_PASS)) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Unauthorized']);
+        exit;
+    }
+
+    $payload = json_decode(file_get_contents('php://input'), true);
+
+    // Responder rapidamente
+    http_response_code(200);
+    header('Content-Type: application/json');
+    echo json_encode(['acknowledged' => true]);
+
+    if (function_exists('fastcgi_finish_request')) {
+        fastcgi_finish_request();
+    }
+
+    // Idempotência
+    if (isProcessed($payload['transactionId'])) {
+        exit;
+    }
+
+    markProcessed($payload['transactionId']);
+
+    // Processar
+    switch ($payload['event']) {
+        case 'CashIn':
+            error_log("[CashIn] R$ " . $payload['finalAmount']);
+            break;
+        case 'CashOut':
+            error_log("[CashOut] R$ " . $payload['originalAmount']);
+            break;
+        case 'CashInReversal':
+            error_log("[CashInReversal] R$ " . $payload['originalAmount']);
+            break;
+        case 'CashOutReversal':
+            error_log("[CashOutReversal] R$ " . $payload['finalAmount']);
+            break;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Idempotência
+
+<Warning>
+  Webhooks podem ser enviados mais de uma vez (em caso de retentativas). Implemente tratamento de idempotência para evitar processamento duplicado.
+</Warning>
+
+Use o campo `transactionId` como chave única:
+
+```typescript
+// Verificar se já processou
+const isProcessed = await redis.get(`webhook:${payload.transactionId}`);
+
+if (isProcessed) {
+  console.log('Webhook já processado, ignorando');
+  return;
+}
+
+// Marcar como processado ANTES de processar
+await redis.set(`webhook:${payload.transactionId}`, '1', 'EX', 86400);
+
+// Processar webhook
+await processWebhook(payload);
+```
+
+<AccordionGroup>
+  <Accordion title="Por que usar Redis?">
+    - **Performance**: Verificação em memória é extremamente rápida
+    - **Distribuído**: Funciona com múltiplas instâncias do servidor
+    - **TTL automático**: Limpeza automática de registros antigos
+  </Accordion>
+
+  <Accordion title="Alternativa com banco de dados">
+    ```sql
+    CREATE TABLE processed_webhooks (
+      transaction_id VARCHAR PRIMARY KEY,
+      processed_at TIMESTAMP DEFAULT NOW()
+    );
+
+    INSERT INTO processed_webhooks (transaction_id)
+    VALUES ($1)
+    ON CONFLICT (transaction_id) DO NOTHING
+    RETURNING transaction_id;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Boas Práticas
+
+<AccordionGroup>
+  <Accordion title="Responda rapidamente (HTTP 200)">
+    O sistema espera resposta em até 10 segundos. Responda imediatamente e processe de forma assíncrona para evitar timeouts.
+
+    ```javascript
+    app.post('/webhooks/pix', (req, res) => {
+      res.status(200).json({ acknowledged: true });
+      processWebhookAsync(req.body).catch(console.error);
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Use HTTPS obrigatoriamente">
+    Configure seu endpoint apenas com HTTPS para garantir transmissão segura.
+  </Accordion>
+
+  <Accordion title="Valide a autenticação">
+    Sempre valide o header `Authorization` com Basic Auth.
+  </Accordion>
+
+  <Accordion title="Registre logs detalhados">
+    ```javascript
+    console.log({
+      timestamp: new Date().toISOString(),
+      event: payload.event,
+      transactionId: payload.transactionId,
+      amount: payload.finalAmount
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Use externalId para correlação">
+    O campo `externalId` contém o identificador enviado na criação. Use-o para correlacionar com seus registros.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Retentativas
+
+Se seu endpoint não responder com HTTP 200 em até 10 segundos:
+
+| Tentativa | Intervalo | Tempo acumulado |
+|-----------|-----------|-----------------|
+| 1ª | Imediato | 0 min |
+| 2ª (1º retry) | 5 minutos | 5 min |
+| 3ª (2º retry) | 5 minutos | 10 min |
+| 4ª (3º retry) | 15 minutos | 25 min |
+
+<Note>
+  Após 4 tentativas sem sucesso (tempo total ~25 minutos), o webhook é movido para uma fila de falhas (DLQ). Implemente consulta periódica como fallback para garantir que nenhuma transação seja perdida.
+</Note>
+
+<Info>
+  A estratégia de retry diferencia erros temporários (network, timeout, 5xx) de erros permanentes (validação, formato inválido). Erros permanentes não são retentados.
+</Info>
+
+---
+
+## Códigos de Resposta
+
+Seu endpoint deve retornar um código HTTP apropriado:
+
+| Código | Descrição | Ação do Sistema |
+|--------|-----------|-----------------|
+| `2xx` | Sucesso (200, 201, 204, etc.) | ✅ Webhook confirmado, não será retentado |
+| `3xx` | Redirecionamento | ⚠️ Considerado falha, será retentado |
+| `4xx` | Erro do cliente | ⚠️ Considerado falha, será retentado |
+| `5xx` | Erro do servidor | ⚠️ Considerado falha, será retentado |
+
+<Info>
+  O sistema valida **apenas o código HTTP**. Qualquer resposta 2xx (200-299) é considerada sucesso, independente do conteúdo do body. Você pode retornar body vazio, `"OK"`, ou qualquer JSON.
+</Info>
+
+---
+
+## Próximos Passos
+
+<CardGroup cols={2}>
+  <Card title="PIX Cash-In" icon="arrow-down" href="/api-reference/guides/pix-cash-in">
+    Aprenda a gerar cobranças PIX
+  </Card>
+  <Card title="PIX Cash-Out" icon="arrow-up" href="/api-reference/guides/pix-cash-out">
+    Aprenda a enviar pagamentos PIX
+  </Card>
+  <Card title="Estornar Pagamento" icon="rotate-left" href="/api-reference/guides/pix-refund-in">
+    Aprenda a estornar recebimentos
+  </Card>
+  <Card title="Autenticação" icon="key" href="/api-reference/guides/authentication">
+    Configure a autenticação da API
+  </Card>
+</CardGroup>
