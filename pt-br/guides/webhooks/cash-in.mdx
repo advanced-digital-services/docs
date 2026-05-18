@@ -1,6 +1,7 @@
 ---
 title: 'Evento cash_in'
 description: 'Notificação enviada quando um SPEI ou OXXO cash-in é confirmado'
+mode: 'wide'
 ---
 
 ## Quando dispara
@@ -62,14 +63,16 @@ Content-Type: application/json
 {"received": true}
 ```
 
-## Exemplo de Handler (Node.js / Express)
+## Exemplos de Handler
 
-```typescript
+<CodeGroup>
+
+```typescript Node.js
 import express from 'express';
 import crypto from 'crypto';
 
 const app = express();
-app.use(express.raw({ type: 'application/json' })); // raw body para HMAC
+app.use(express.raw({ type: 'application/json' })); // raw body for HMAC
 
 const SECRET = process.env.NTXPAY_WEBHOOK_SECRET!;
 
@@ -77,7 +80,7 @@ app.post('/webhooks/ntxpay', (req, res) => {
   const sig = req.header('X-NTXPay-Signature') ?? '';
   const expected = 'sha256=' + crypto
     .createHmac('sha256', SECRET)
-    .update(req.body) // req.body é Buffer
+    .update(req.body) // req.body is Buffer
     .digest('hex');
 
   if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
@@ -86,11 +89,137 @@ app.post('/webhooks/ntxpay', (req, res) => {
 
   const event = JSON.parse(req.body.toString());
   if (event.event === 'cash_in' && event.transaction.status === 'CONFIRMED') {
-    enqueue(event); // processa async
+    enqueue(event); // process async
   }
 
   res.json({ received: true });
 });
 ```
 
-Veja o [guia de implementação](/api-reference/guides/webhooks/implementation) para Python e PHP.
+```python Python
+import hmac
+import hashlib
+import json
+import os
+from flask import Flask, request, abort, jsonify
+
+app = Flask(__name__)
+SECRET = os.environ["NTXPAY_WEBHOOK_SECRET"].encode()
+
+@app.post("/webhooks/ntxpay")
+def webhook():
+    raw = request.get_data()  # raw bytes — required for HMAC
+    sig = request.headers.get("X-NTXPay-Signature", "")
+    expected = "sha256=" + hmac.new(SECRET, raw, hashlib.sha256).hexdigest()
+
+    if not hmac.compare_digest(sig, expected):
+        abort(401)
+
+    event = json.loads(raw)
+    if event["event"] == "cash_in" and event["transaction"]["status"] == "CONFIRMED":
+        enqueue(event)  # process async
+
+    return jsonify(received=True)
+```
+
+```java Java
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.MessageDigest;
+import java.util.Map;
+
+@RestController
+public class NtxPayCashInHandler {
+    private static final byte[] SECRET =
+        System.getenv("NTXPAY_WEBHOOK_SECRET").getBytes();
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    @PostMapping(value = "/webhooks/ntxpay", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> handle(
+        @RequestHeader("X-NTXPay-Signature") String sig,
+        @RequestBody byte[] raw
+    ) throws Exception {
+        String expected = "sha256=" + hmacSha256Hex(SECRET, raw);
+        if (!MessageDigest.isEqual(sig.getBytes(), expected.getBytes())) {
+            return ResponseEntity.status(401).build();
+        }
+
+        Map<String, Object> event = mapper.readValue(raw, new TypeReference<>() {});
+        Map<String, Object> tx = (Map<String, Object>) event.get("transaction");
+        if ("cash_in".equals(event.get("event"))
+            && "CONFIRMED".equals(tx.get("status"))) {
+            enqueue(event); // process async
+        }
+
+        return ResponseEntity.ok(Map.of("received", true));
+    }
+
+    private static String hmacSha256Hex(byte[] secret, byte[] data) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(secret, "HmacSHA256"));
+        byte[] result = mac.doFinal(data);
+        StringBuilder sb = new StringBuilder(result.length * 2);
+        for (byte b : result) sb.append(String.format("%02x", b));
+        return sb.toString();
+    }
+}
+```
+
+```go Go
+package main
+
+import (
+    "crypto/hmac"
+    "crypto/sha256"
+    "encoding/hex"
+    "encoding/json"
+    "io"
+    "net/http"
+    "os"
+)
+
+var secret = []byte(os.Getenv("NTXPAY_WEBHOOK_SECRET"))
+
+type webhookEvent struct {
+    Event       string `json:"event"`
+    Transaction struct {
+        Status string `json:"status"`
+    } `json:"transaction"`
+}
+
+func handleCashIn(w http.ResponseWriter, r *http.Request) {
+    raw, _ := io.ReadAll(r.Body)
+
+    sig := r.Header.Get("X-NTXPay-Signature")
+    h := hmac.New(sha256.New, secret)
+    h.Write(raw)
+    expected := "sha256=" + hex.EncodeToString(h.Sum(nil))
+
+    if !hmac.Equal([]byte(sig), []byte(expected)) {
+        w.WriteHeader(http.StatusUnauthorized)
+        return
+    }
+
+    var event webhookEvent
+    if err := json.Unmarshal(raw, &event); err == nil {
+        if event.Event == "cash_in" && event.Transaction.Status == "CONFIRMED" {
+            enqueue(raw) // process async
+        }
+    }
+
+    _ = json.NewEncoder(w).Encode(map[string]bool{"received": true})
+}
+
+func main() {
+    http.HandleFunc("/webhooks/ntxpay", handleCashIn)
+    _ = http.ListenAndServe(":8080", nil)
+}
+```
+
+</CodeGroup>

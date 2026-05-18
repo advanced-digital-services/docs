@@ -1,6 +1,7 @@
 ---
 title: 'Implementação de Webhook'
-description: 'Validação HMAC e processamento idempotente em Node, Python e PHP'
+description: 'Validação HMAC e processamento idempotente em Node.js, Python, Java e Go'
+mode: 'wide'
 ---
 
 ## Princípios
@@ -11,19 +12,21 @@ Toda implementação de webhook precisa cobrir 3 coisas:
 2. **Resposta rápida** (`200 OK` em ≤10s)
 3. **Idempotência** via `X-NTXPay-Delivery` ou `transaction.id`
 
-## Node.js / Express
+## Exemplos de Código
 
-```typescript
+<CodeGroup>
+
+```typescript Node.js
 import express from 'express';
 import crypto from 'crypto';
 
 const app = express();
 
-// CRÍTICO: usar raw body, não JSON parseado, para o HMAC bater
+// CRITICAL: use raw body, not parsed JSON, so HMAC matches
 app.use('/webhooks/ntxpay', express.raw({ type: 'application/json' }));
 
 const SECRET = process.env.NTXPAY_WEBHOOK_SECRET!;
-const seen = new Set<string>(); // produção: Redis com TTL
+const seen = new Set<string>(); // production: Redis with TTL
 
 app.post('/webhooks/ntxpay', async (req, res) => {
   const sig = req.header('X-NTXPay-Signature') ?? '';
@@ -45,27 +48,25 @@ app.post('/webhooks/ntxpay', async (req, res) => {
 
   const event = JSON.parse(req.body.toString());
 
-  // Processar assíncrono — não bloquear a resposta
+  // Process async — don't block response
   enqueue(event).catch(console.error);
 
   res.json({ received: true });
 });
 ```
 
-## Python / Flask
-
-```python
+```python Python
 import hmac
 import hashlib
 from flask import Flask, request, abort, jsonify
 
 app = Flask(__name__)
 SECRET = b'<seu-webhook-secret>'
-seen = set()  # produção: Redis com TTL
+seen = set()  # production: Redis with TTL
 
 @app.post('/webhooks/ntxpay')
 def webhook():
-    raw = request.get_data()  # bytes crus
+    raw = request.get_data()  # raw bytes — essential so HMAC matches
     sig = request.headers.get('X-NTXPay-Signature', '')
     delivery_id = request.headers.get('X-NTXPay-Delivery', '')
 
@@ -78,44 +79,119 @@ def webhook():
     seen.add(delivery_id)
 
     event = request.get_json()
-    # enfileirar assincronamente
+    # enqueue asynchronously
     enqueue(event)
 
     return jsonify(received=True)
 ```
 
-## PHP
+```java Java
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
-```php
-<?php
-$secret = getenv('NTXPAY_WEBHOOK_SECRET');
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.MessageDigest;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
-$raw = file_get_contents('php://input');
-$signature = $_SERVER['HTTP_X_NTXPAY_SIGNATURE'] ?? '';
-$deliveryId = $_SERVER['HTTP_X_NTXPAY_DELIVERY'] ?? '';
+@RestController
+public class NtxPayWebhook {
+    private static final byte[] SECRET =
+        System.getenv("NTXPAY_WEBHOOK_SECRET").getBytes();
+    // production: Redis with TTL
+    private final Set<String> seen = ConcurrentHashMap.newKeySet();
 
-$expected = 'sha256=' . hash_hmac('sha256', $raw, $secret);
+    @PostMapping(value = "/webhooks/ntxpay", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> handle(
+        @RequestHeader("X-NTXPay-Signature") String sig,
+        @RequestHeader("X-NTXPay-Delivery") String deliveryId,
+        @RequestBody byte[] raw // raw bytes — essential so HMAC matches
+    ) throws Exception {
+        String expected = "sha256=" + hmacSha256Hex(SECRET, raw);
+        if (!MessageDigest.isEqual(sig.getBytes(), expected.getBytes())) {
+            return ResponseEntity.status(401).build();
+        }
+        if (!seen.add(deliveryId)) {
+            return ResponseEntity.ok(Map.of("duplicate", true));
+        }
 
-if (!hash_equals($signature, $expected)) {
-    http_response_code(401);
-    exit;
+        // enqueue async processing
+        return ResponseEntity.ok(Map.of("received", true));
+    }
+
+    private static String hmacSha256Hex(byte[] secret, byte[] data) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(secret, "HmacSHA256"));
+        byte[] result = mac.doFinal(data);
+        StringBuilder sb = new StringBuilder(result.length * 2);
+        for (byte b : result) sb.append(String.format("%02x", b));
+        return sb.toString();
+    }
 }
-
-// Dedupe (use Redis em produção)
-if (isset($_SESSION['seen'][$deliveryId])) {
-    echo json_encode(['duplicate' => true]);
-    exit;
-}
-$_SESSION['seen'][$deliveryId] = true;
-
-$event = json_decode($raw, true);
-
-// Enfileirar processamento assíncrono
-// processarAsync($event);
-
-http_response_code(200);
-echo json_encode(['received' => true]);
 ```
+
+```go Go
+package main
+
+import (
+    "crypto/hmac"
+    "crypto/sha256"
+    "encoding/hex"
+    "encoding/json"
+    "io"
+    "net/http"
+    "os"
+    "sync"
+)
+
+var (
+    secret = []byte(os.Getenv("NTXPAY_WEBHOOK_SECRET"))
+    seenMu sync.Mutex
+    seen   = make(map[string]bool) // production: Redis with TTL
+)
+
+func handleWebhook(w http.ResponseWriter, r *http.Request) {
+    raw, err := io.ReadAll(r.Body)
+    if err != nil {
+        w.WriteHeader(http.StatusBadRequest)
+        return
+    }
+
+    sig := r.Header.Get("X-NTXPay-Signature")
+    deliveryID := r.Header.Get("X-NTXPay-Delivery")
+
+    h := hmac.New(sha256.New, secret)
+    h.Write(raw)
+    expected := "sha256=" + hex.EncodeToString(h.Sum(nil))
+
+    if !hmac.Equal([]byte(sig), []byte(expected)) {
+        w.WriteHeader(http.StatusUnauthorized)
+        return
+    }
+
+    seenMu.Lock()
+    if seen[deliveryID] {
+        seenMu.Unlock()
+        _ = json.NewEncoder(w).Encode(map[string]bool{"duplicate": true})
+        return
+    }
+    seen[deliveryID] = true
+    seenMu.Unlock()
+
+    // enqueue async processing
+    _ = json.NewEncoder(w).Encode(map[string]bool{"received": true})
+}
+
+func main() {
+    http.HandleFunc("/webhooks/ntxpay", handleWebhook)
+    _ = http.ListenAndServe(":8080", nil)
+}
+```
+
+</CodeGroup>
 
 ## Por que raw body?
 
@@ -125,30 +201,108 @@ O HMAC é calculado sobre os **bytes exatos** que o NTX Pay enviou. Se o framewo
 
 Filtre antes de processar:
 
-```typescript
+<CodeGroup>
+
+```typescript Node.js
 const event = JSON.parse(req.body.toString());
 
 switch (event.event) {
   case 'cash_in':
     if (event.transaction.status === 'CONFIRMED') {
-      await marcarPedidoPago(event.transaction.externalId);
+      await markOrderPaid(event.transaction.externalId);
     }
     break;
 
   case 'cash_out':
     if (event.transaction.status === 'CONFIRMED') {
-      await marcarPayoutLiquidado(event.transaction.id);
+      await markPayoutSettled(event.transaction.id);
     } else if (event.transaction.status === 'FAILED') {
-      await marcarPayoutFalho(event.transaction.id);
+      await markPayoutFailed(event.transaction.id);
     }
     break;
 
   case 'refund_in':
   case 'refund_out':
-    await processarEstorno(event);
+    await processRefund(event);
     break;
 }
 ```
+
+```python Python
+event = request.get_json()
+evt_type = event["event"]
+tx = event["transaction"]
+status = tx["status"]
+
+if evt_type == "cash_in":
+    if status == "CONFIRMED":
+        mark_order_paid(tx["externalId"])
+
+elif evt_type == "cash_out":
+    if status == "CONFIRMED":
+        mark_payout_settled(tx["id"])
+    elif status == "FAILED":
+        mark_payout_failed(tx["id"])
+
+elif evt_type in ("refund_in", "refund_out"):
+    process_refund(event)
+```
+
+```java Java
+// `raw` is the request body byte[], `mapper` is a Jackson ObjectMapper
+Map<String, Object> event = mapper.readValue(raw, new TypeReference<>() {});
+String evtType = (String) event.get("event");
+Map<String, Object> tx = (Map<String, Object>) event.get("transaction");
+String status = (String) tx.get("status");
+
+switch (evtType) {
+    case "cash_in" -> {
+        if ("CONFIRMED".equals(status)) {
+            markOrderPaid((String) tx.get("externalId"));
+        }
+    }
+    case "cash_out" -> {
+        if ("CONFIRMED".equals(status)) {
+            markPayoutSettled(((Number) tx.get("id")).longValue());
+        } else if ("FAILED".equals(status)) {
+            markPayoutFailed(((Number) tx.get("id")).longValue());
+        }
+    }
+    case "refund_in", "refund_out" -> processRefund(event);
+}
+```
+
+```go Go
+var event struct {
+    Event       string `json:"event"`
+    Transaction struct {
+        ID         int64  `json:"id"`
+        ExternalID string `json:"externalId"`
+        Status     string `json:"status"`
+    } `json:"transaction"`
+}
+if err := json.Unmarshal(raw, &event); err != nil {
+    return err
+}
+
+switch event.Event {
+case "cash_in":
+    if event.Transaction.Status == "CONFIRMED" {
+        markOrderPaid(event.Transaction.ExternalID)
+    }
+case "cash_out":
+    switch event.Transaction.Status {
+    case "CONFIRMED":
+        markPayoutSettled(event.Transaction.ID)
+    case "FAILED":
+        markPayoutFailed(event.Transaction.ID)
+    }
+case "refund_in", "refund_out":
+    processRefund(event)
+}
+```
+
+</CodeGroup>
 
 ## Re-Tentativas
 
@@ -164,4 +318,4 @@ Se você devolver status ≠ `2xx`, o NTX Pay retenta até **5 vezes** em backof
 - **Processe assíncrono**: webhook handler só valida + enfileira
 - **Monitore latência** do handler — alvo P95 < 500ms
 - **Logue `X-NTXPay-Delivery`** para auditoria
-- **Re-consulte `/api/transactions`** se o webhook trouxer estado conflitante com seu banco
+- **Re-consulte `GET /api/spei/transaction/{externalId}`** se o webhook trouxer estado conflitante com seu banco

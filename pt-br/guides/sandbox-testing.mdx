@@ -1,5 +1,5 @@
 ---
-title: 'Sandbox Testing'
+title: 'Testes em Sandbox'
 description: 'Como usar o ambiente sandbox do NTX Pay México para simular cenários SPEI e OXXO sem custo nem risco.'
 ---
 
@@ -16,26 +16,6 @@ O sandbox é o ambiente público da NTX Pay México para integração e testes:
 <Info>
   Atualmente toda integração com a NTX Pay acontece pelo sandbox. Os endpoints, payloads e webhooks descritos nesta documentação são os definitivos — quando produção for liberada, o mesmo código funcionará apenas trocando as credenciais.
 </Info>
-
-## Começando com Sandbox
-
-<Steps>
-  <Step title="Solicite uma conta sandbox">
-    Contate seu account manager ou escreva para `support@ntxpay.com`.
-  </Step>
-  <Step title="Receba suas credenciais">
-    Certificado X.509 + `clientId`/`clientSecret` exclusivos do sandbox.
-  </Step>
-  <Step title="Registre a URL do webhook">
-    `POST /api/webhooks-config` com a URL HTTPS que vai receber os eventos simulados.
-  </Step>
-  <Step title="Confirme o modo sandbox no painel">
-    No dashboard, vá em **Settings** e verifique se o provider é `sandbox`.
-  </Step>
-  <Step title="Autentique e simule cenários">
-    Autentique via `POST /api/auth/token` e use o header `X-Sandbox-Scenario` para simular resultados.
-  </Step>
-</Steps>
 
 ## Visão Geral
 
@@ -202,7 +182,7 @@ response = requests.post(
     }
   },
   "errorCode": "INSUFFICIENT_FUNDS",
-  "errorMessage": "Conta sem saldo suficiente",
+  "errorMessage": "Account without sufficient balance",
   "metadata": {}
 }
 ```

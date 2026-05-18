@@ -1,5 +1,5 @@
 ---
-title: 'Postman Collections'
+title: 'Coleções Postman'
 description: 'Importe a coleção oficial do Postman para testar a API NTX Pay localmente.'
 ---
 
@@ -29,14 +29,12 @@ O environment espera 3 variáveis:
 A coleção está organizada na ordem típica de uso:
 
 1. **Auth → Generate Token** — execute primeiro. O response salva automaticamente o `access_token` em uma variável de environment.
-2. **Balance → Get Balance** — confirma que o token está funcionando.
-3. **SPEI → Cash-In** — cria uma cobrança simulada.
-4. **Transactions → List** — consulta o estado.
+2. **SPEI → Cash-In** — cria uma cobrança simulada para confirmar que o token está funcionando.
+3. **Transactions → List** — consulta o estado da cobrança recém-criada.
 
 ## Pastas Disponíveis
 
 - `Auth` — geração de JWT
-- `Account` — signup e consulta de saldo
 - `SPEI` — cash-in, cash-out, get transaction by externalId
 - `OXXO` — cash-in
 - `Transactions` — listar

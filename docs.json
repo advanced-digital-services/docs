@@ -65,12 +65,10 @@
                 "pages": [
                   "es/endpoints/signup",
                   "es/endpoints/generate-token",
-                  "es/endpoints/get-balance",
                   "es/endpoints/spei-cash-in",
                   "es/endpoints/spei-cash-out",
                   "es/endpoints/spei-transaction",
                   "es/endpoints/oxxo-cash-in",
-                  "es/endpoints/transactions-list",
                   "es/endpoints/webhooks-config-list",
                   "es/endpoints/webhooks-config-setup",
                   "es/endpoints/webhooks-config-delete"
@@ -111,12 +109,10 @@
                 "pages": [
                   "en/endpoints/signup",
                   "en/endpoints/generate-token",
-                  "en/endpoints/get-balance",
                   "en/endpoints/spei-cash-in",
                   "en/endpoints/spei-cash-out",
                   "en/endpoints/spei-transaction",
                   "en/endpoints/oxxo-cash-in",
-                  "en/endpoints/transactions-list",
                   "en/endpoints/webhooks-config-list",
                   "en/endpoints/webhooks-config-setup",
                   "en/endpoints/webhooks-config-delete"
@@ -161,13 +157,6 @@
                 ]
               },
               {
-                "group": "Conta",
-                "pages": [
-                  "pt-br/endpoints/signup",
-                  "pt-br/endpoints/get-balance"
-                ]
-              },
-              {
                 "group": "SPEI",
                 "pages": [
                   "pt-br/endpoints/spei-cash-in",
@@ -179,12 +168,6 @@
                 "group": "OXXO",
                 "pages": [
                   "pt-br/endpoints/oxxo-cash-in"
-                ]
-              },
-              {
-                "group": "Transações",
-                "pages": [
-                  "pt-br/endpoints/transactions-list"
                 ]
               },
               {

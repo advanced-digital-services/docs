@@ -5,7 +5,7 @@ description: 'Boas-vindas à API NTX Pay México. Este guia te leva pelos primei
 
 ## Visão Geral
 
-A API NTX Pay México permite que sua empresa realize operações de pagamento, consulte saldos, reconcilie transações e receba notificações por webhooks — tudo de forma segura e escalável. A autenticação é via **certificado X.509 (mTLS) + OAuth 2.0**, retornando um **JWT** de curta duração para cada requisição.
+A API NTX Pay México permite que sua empresa realize operações de pagamento, reconcilie transações e receba notificações por webhooks — tudo de forma segura e escalável. A autenticação é via **certificado X.509 (mTLS) + OAuth 2.0**, retornando um **JWT** de curta duração para cada requisição.
 
 ## Passo a Passo no Sandbox
 
@@ -39,7 +39,7 @@ A API NTX Pay México permite que sua empresa realize operações de pagamento, 
       -H "Content-Type: application/json" \
       -d '{
         "amountCentavos": 50000,
-        "externalId": "pedido-001",
+        "externalId": "order-001",
         "customerName": "Juan Perez"
       }'
     ```

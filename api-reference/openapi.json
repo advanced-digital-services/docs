@@ -22,20 +22,12 @@
       "description": "Criação de conta (sandbox ou produção)"
     },
     {
-      "name": "Balance",
-      "description": "Consulta de saldo em centavos MXN"
-    },
-    {
       "name": "SPEI",
       "description": "Transferências interbancárias instantâneas mexicanas (cash-in via CLABE descartável; cash-out para CLABE)"
     },
     {
       "name": "OXXO",
       "description": "Cobrança em dinheiro na rede OXXO (cash-in via boleto/código de barras)"
-    },
-    {
-      "name": "Transactions",
-      "description": "Listagem unificada de transações da conta"
     },
     {
       "name": "Webhooks Config",
@@ -218,29 +210,8 @@
           }
         }
       },
-      "GetBalanceOutputDto": {
-        "type": "object",
-        "properties": {
-          "availableCentavos": {
-            "type": "integer",
-            "description": "Saldo disponível em centavos MXN",
-            "example": 4873490
-          },
-          "pendingCentavos": {
-            "type": "integer",
-            "description": "Saldo pendente/bloqueado em centavos MXN",
-            "example": 0
-          },
-          "currency": {
-            "type": "string",
-            "description": "Moeda da conta (sempre MXN)",
-            "example": "MXN"
-          }
-        }
-      },
       "SpeiCashInInputDto": {
         "type": "object",
-        "required": [],
         "properties": {
           "amountCentavos": {
             "type": "integer",
@@ -371,7 +342,6 @@
       },
       "SpeiCashOutInputDto": {
         "type": "object",
-        "required": [],
         "properties": {
           "amountCentavos": {
             "type": "integer",
@@ -563,114 +533,6 @@
           "amountCentavos": {
             "type": "integer",
             "example": 20000
-          }
-        }
-      },
-      "TransactionOutputDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "example": 12345
-          },
-          "externalId": {
-            "type": "string",
-            "nullable": true,
-            "example": "ext-abc-123"
-          },
-          "paymentMethod": {
-            "type": "string",
-            "enum": [
-              "SPEI",
-              "OXXO"
-            ],
-            "example": "SPEI"
-          },
-          "direction": {
-            "type": "string",
-            "enum": [
-              "in",
-              "out"
-            ],
-            "example": "in"
-          },
-          "type": {
-            "type": "string",
-            "description": "cash_in, cash_out, refund_in, refund_out, internal_transfer",
-            "example": "cash_in"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "PENDING",
-              "CONFIRMED",
-              "FAILED",
-              "EXPIRED"
-            ],
-            "example": "CONFIRMED"
-          },
-          "provider": {
-            "type": "string",
-            "enum": [
-              "smartfastpay",
-              "sandbox"
-            ],
-            "example": "smartfastpay"
-          },
-          "amountCentavos": {
-            "type": "integer",
-            "example": 50000
-          },
-          "clabe": {
-            "type": "string",
-            "nullable": true,
-            "example": "012180001234567890"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-05-12T14:30:00.000Z"
-          },
-          "confirmedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time",
-            "example": "2026-05-12T14:31:05.000Z"
-          }
-        }
-      },
-      "PaginationMetadataDto": {
-        "type": "object",
-        "properties": {
-          "total": {
-            "type": "integer",
-            "example": 142
-          },
-          "limit": {
-            "type": "integer",
-            "example": 20
-          },
-          "offset": {
-            "type": "integer",
-            "example": 0
-          },
-          "hasMore": {
-            "type": "boolean",
-            "example": true
-          }
-        }
-      },
-      "SearchTransactionsOutputDto": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TransactionOutputDto"
-            }
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/PaginationMetadataDto"
           }
         }
       },
@@ -983,39 +845,6 @@
         }
       }
     },
-    "/api/balance": {
-      "get": {
-        "summary": "Consultar saldo da conta",
-        "description": "**Requer Bearer JWT**. Retorna saldo disponível e pendente em centavos MXN.",
-        "operationId": "BalanceController_get",
-        "tags": [
-          "Balance"
-        ],
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Saldo consultado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GetBalanceOutputDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Token inválido ou ausente"
-          },
-          "502": {
-            "description": "account-ms indisponível"
-          }
-        }
-      }
-    },
     "/api/spei/cash-in": {
       "post": {
         "summary": "Criar cobrança SPEI (cash-in)",
@@ -1195,106 +1024,6 @@
           },
           "401": {
             "description": "Token inválido"
-          },
-          "502": {
-            "description": "mexico-ms indisponível"
-          }
-        }
-      }
-    },
-    "/api/transactions": {
-      "get": {
-        "summary": "Listar transações da conta",
-        "description": "**Requer Bearer JWT**. Retorna a lista paginada de transações da conta autenticada (SPEI e OXXO unificados). Rate-limit: 30 req/min por conta.",
-        "operationId": "TransactionsController_search",
-        "tags": [
-          "Transactions"
-        ],
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 0
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "PENDING",
-                "CONFIRMED",
-                "FAILED",
-                "EXPIRED"
-              ]
-            }
-          },
-          {
-            "name": "paymentMethod",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "SPEI",
-                "OXXO"
-              ]
-            }
-          },
-          {
-            "name": "direction",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "in",
-                "out"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Lista de transações",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SearchTransactionsOutputDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Parâmetros inválidos"
-          },
-          "401": {
-            "description": "Token inválido"
-          },
-          "429": {
-            "description": "Rate limit excedido (30 req/min por conta)"
           },
           "502": {
             "description": "mexico-ms indisponível"

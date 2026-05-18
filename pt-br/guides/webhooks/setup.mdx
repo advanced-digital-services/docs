@@ -102,15 +102,15 @@ curl -X DELETE https://sandbox.ntxpay.com/api/webhooks-config/42 \
 Você pode configurar **vários webhooks** simultaneamente, cada um com seu conjunto de eventos. Útil para:
 
 - Separar **logs/auditoria** (recebe todos os eventos) de **processamento** (só `cash_in`/`cash_out`)
-- Ambiente de **homologação interna** vs produção
 - Múltiplos serviços consumindo eventos diferentes
+- Ambientes internos distintos (ex.: dev vs homologação interna)
 
 ## Testando o Endpoint
 
-Antes de configurar em produção, valide seu endpoint:
+Antes de liberar o webhook para receber tráfego de verdade, valide seu endpoint:
 
-1. Configure em sandbox primeiro
-2. Use [webhook.site](https://webhook.site) ou [ngrok](https://ngrok.com) para inspecionar o tráfego
+1. Use [webhook.site](https://webhook.site) ou [ngrok](https://ngrok.com) para inspecionar o tráfego
+2. Dispare cobranças com `X-Sandbox-Scenario` (veja [Testes em Sandbox](/pt-br/guides/sandbox-testing))
 3. Confira que sua aplicação:
    - Valida `X-NTXPay-Signature` corretamente
    - Retorna `200` em menos de 10 segundos
@@ -119,10 +119,10 @@ Antes de configurar em produção, valide seu endpoint:
 ## Próximos Passos
 
 <CardGroup cols={2}>
-  <Card title="Implementação" href="/api-reference/guides/webhooks/implementation">
-    Validação HMAC em Node, Python e PHP
+  <Card title="Implementação" href="/pt-br/guides/webhooks/implementation">
+    Validação HMAC em Node.js, Python, Java e Go
   </Card>
-  <Card title="Eventos" href="/api-reference/guides/webhooks/cash-in">
+  <Card title="Eventos" href="/pt-br/guides/webhooks/cash-in">
     Payload de cada tipo de evento
   </Card>
 </CardGroup>

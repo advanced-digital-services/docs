@@ -5,9 +5,9 @@ description: 'Notificações automáticas para eventos SPEI e OXXO'
 
 ## O que são Webhooks
 
-Webhooks permitem que o NTX Pay envie notificações HTTPS para o seu servidor sempre que um evento relevante ocorre — confirmação de cash-in, falha de cash-out, etc. — sem você precisar fazer polling em `GET /api/transactions`.
+Webhooks permitem que o NTX Pay envie notificações HTTPS para o seu servidor sempre que um evento relevante ocorre — confirmação de cash-in, falha de cash-out, etc. — sem você precisar fazer polling em `GET /api/spei/transaction/{externalId}`.
 
-## Eventos Disponíveis
+## Eventos Disponíveis (verificar se tem mais eventos a serem adicionados)
 
 | Evento | Quando dispara |
 |---|---|
@@ -25,7 +25,7 @@ Endpoint: `POST /api/webhooks-config`. Você fornece:
 - **`events`** — array com 1 a 5 eventos
 - **`secret`** — opcional. Se omitido, o NTX Pay gera um automaticamente e retorna na resposta.
 
-Veja o [guia de Setup](/api-reference/guides/webhooks/setup) para o passo a passo.
+Veja o [guia de Setup](/pt-br/guides/webhooks/setup) para o passo a passo.
 
 ## Segurança — Assinatura HMAC
 
@@ -52,16 +52,16 @@ Todo webhook é assinado com HMAC-SHA256 usando o `secret`. Headers enviados:
 1. **Responda `200` imediatamente** após validar a assinatura e enfileirar o evento.
 2. **Deduplique por `X-NTXPay-Delivery`** ou `transaction.id`.
 3. **Idempotência**: processe `cash_in` confirmado para o mesmo `externalId` uma única vez.
-4. **Re-consulte** `/api/transactions` se tiver dúvida sobre estado — webhook é uma otimização, não a fonte da verdade.
+4. **Re-consulte** `GET /api/spei/transaction/{externalId}` se tiver dúvida sobre estado — webhook é uma otimização, não a fonte da verdade.
 5. **HTTPS obrigatório** — webhooks só são enviados a URLs com protocolo HTTPS.
 
 ## Próximos Passos
 
 <CardGroup cols={2}>
-  <Card title="Setup de Webhook" href="/api-reference/guides/webhooks/setup">
+  <Card title="Setup de Webhook" href="/pt-br/guides/webhooks/setup">
     Configure o endpoint na sua conta
   </Card>
-  <Card title="Implementação" href="/api-reference/guides/webhooks/implementation">
-    Exemplos em Node, Python e PHP de validação HMAC
+  <Card title="Implementação" href="/pt-br/guides/webhooks/implementation">
+    Exemplos em Node.js, Python, Java e Go de validação HMAC
   </Card>
 </CardGroup>

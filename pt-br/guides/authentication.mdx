@@ -64,7 +64,7 @@ curl -X POST https://sandbox.ntxpay.com/api/auth/token \
 Inclua o `access_token` em todas as requisições autenticadas:
 
 ```bash
-curl -X GET https://sandbox.ntxpay.com/api/balance \
+curl -X GET https://sandbox.ntxpay.com/api/spei/transaction/order-abc-123 \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -240,10 +240,10 @@ func getToken() (string, error) {
 ## Próximos Passos
 
 <CardGroup cols={2}>
-  <Card title="Quickstart" href="/api-reference/guides/quickstart">
-    Veja o fluxo completo (signup → token → transação)
+  <Card title="Testes em Sandbox" href="/pt-br/guides/sandbox-testing">
+    Use o header `X-Sandbox-Scenario` para simular sucesso, falha e atraso nos webhooks
   </Card>
-  <Card title="Consulta de Saldo" href="/api-reference/guides/balance">
-    Use o token para consultar o saldo
+  <Card title="Criar Cobrança SPEI" href="/pt-br/endpoints/spei-cash-in">
+    Aplique o token Bearer e faça sua primeira cobrança SPEI Cash-In
   </Card>
 </CardGroup>
