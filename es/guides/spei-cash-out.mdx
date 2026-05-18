@@ -1,0 +1,132 @@
+---
+title: 'SPEI Cash-Out'
+description: 'Envía transferencias SPEI a cualquier CLABE'
+---
+
+## Visión General
+
+El **SPEI cash-out** envía una transferencia interbancaria a una **CLABE de destino**. El saldo de la cuenta se debita y NTX Pay reenvía al provider (`smartfastpay` en producción, `sandbox` en testing). La confirmación llega vía webhook `cash_out`.
+
+## Endpoint
+
+### POST /api/spei/cash-out
+
+#### Headers
+
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+#### Request
+
+```bash
+curl -X POST https://api.ntxpay.com/api/spei/cash-out \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amountCentavos": 50000,
+    "destinationClabe": "012180001234567890",
+    "beneficiaryName": "Maria Lopez",
+    "beneficiaryTaxId": "LOMA850101ABC",
+    "concept": "Pago factura 123"
+  }'
+```
+
+#### Response (201)
+
+```json
+{
+  "id": 56789,
+  "status": "PENDING",
+  "destinationClabe": "012180001234567890",
+  "amountCentavos": 50000,
+  "referenceNumerical": "9876543",
+  "createdAt": "2026-05-13T12:00:00.000Z"
+}
+```
+
+## Campos del Request
+
+<ParamField path="amountCentavos" type="integer" required>
+  Valor en centavos MXN (mínimo 1). Ej.: `50000` = $500.00 MXN.
+</ParamField>
+
+<ParamField path="destinationClabe" type="string" required>
+  CLABE destino — **exactamente 18 dígitos numéricos** (regex: `^\d{18}$`).
+</ParamField>
+
+<ParamField path="beneficiaryName" type="string" required>
+  Nombre del beneficiario (3–255 caracteres).
+</ParamField>
+
+<ParamField path="beneficiaryTaxId" type="string">
+  RFC/CURP del beneficiario (10–20 caracteres). Recomendado para conciliación.
+</ParamField>
+
+<ParamField path="concept" type="string">
+  Concepto que aparece en el extracto del beneficiario (hasta 255 caracteres).
+</ParamField>
+
+## Validación de Saldo
+
+Antes de enviar, valida el saldo:
+
+```typescript
+const balance = await getBalance(token);
+if (balance.availableCentavos < amountCentavos) {
+  throw new Error('Saldo insuficiente');
+}
+```
+
+<Warning>
+  Saldo insuficiente retorna `400` — la transacción **no se crea**. Aplica idempotencia en el cliente (no reproceses el mismo pedido tras `400` sin revalidar el saldo).
+</Warning>
+
+## Estados
+
+| Status | Significado |
+|---|---|
+| `PENDING` | Cash-out aceptado, esperando liquidación SPEI |
+| `CONFIRMED` | Liquidado en Banxico |
+| `FAILED` | Rechazado por el provider o por la red SPEI |
+
+## Códigos de Error
+
+| Código | Causa |
+|---|---|
+| `400` | Saldo insuficiente, CLABE inválida, payload inválido |
+| `401` | Token inválido |
+| `502` | mexico-ms / provider no disponible — no reenvíes sin checar status en `GET /api/transactions` |
+
+## Ejemplo Node.js con Retry
+
+```typescript
+async function speiCashOut(token: string, dto: any) {
+  try {
+    const { data } = await axios.post(
+      'https://api.ntxpay.com/api/spei/cash-out',
+      dto,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    return data; // status: PENDING
+  } catch (err) {
+    if (err.response?.status === 502) {
+      // No sabemos si la transacción fue creada. Consulta /api/transactions filtrando por externalId
+      // antes de hacer retry.
+    }
+    throw err;
+  }
+}
+```
+
+## Próximos Pasos
+
+<CardGroup cols={2}>
+  <Card title="Webhook cash_out" href="/es/guides/webhooks/cash-out">
+    Detalles del payload del webhook de liquidación
+  </Card>
+  <Card title="Listar Transacciones" href="/es/guides/transactions-list">
+    Verifica status sin depender de webhook
+  </Card>
+</CardGroup>

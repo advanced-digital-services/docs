@@ -1,0 +1,80 @@
+---
+title: 'Evento cash_out'
+description: 'Notificación enviada cuando un SPEI cash-out es liquidado o falla'
+---
+
+## Cuándo dispara
+
+El evento `cash_out` se dispara en dos escenarios:
+
+- **Éxito** — el SPEI cash-out enviado vía `POST /api/spei/cash-out` fue liquidado en Banxico (`status: CONFIRMED`)
+- **Falla** — la red SPEI o el provider rechazó la transferencia (`status: FAILED`)
+
+## Payload (confirmado)
+
+```json
+{
+  "event": "cash_out",
+  "deliveryId": "1a3f9e8d-2c47-4b9c-aa18-77a2b3c4d5e6",
+  "createdAt": "2026-05-13T12:00:42.000Z",
+  "transaction": {
+    "id": 56789,
+    "externalId": "payout-001",
+    "paymentMethod": "SPEI",
+    "direction": "out",
+    "type": "cash_out",
+    "status": "CONFIRMED",
+    "provider": "smartfastpay",
+    "amountCentavos": 50000,
+    "clabe": "012180001234567890",
+    "createdAt": "2026-05-13T12:00:00.000Z",
+    "confirmedAt": "2026-05-13T12:00:42.000Z"
+  }
+}
+```
+
+## Payload (falla)
+
+```json
+{
+  "event": "cash_out",
+  "deliveryId": "...",
+  "createdAt": "2026-05-13T12:01:00.000Z",
+  "transaction": {
+    "id": 56789,
+    "status": "FAILED",
+    "paymentMethod": "SPEI",
+    "direction": "out",
+    "type": "cash_out",
+    "amountCentavos": 50000,
+    "clabe": "012180001234567890",
+    "createdAt": "2026-05-13T12:00:00.000Z",
+    "confirmedAt": null
+  }
+}
+```
+
+Cuando `status: FAILED`, el saldo bloqueado se devuelve automáticamente.
+
+## Headers
+
+| Header | Valor |
+|---|---|
+| `X-NTXPay-Event` | `cash_out` |
+| `X-NTXPay-Signature` | `sha256=<hmac>` |
+| `X-NTXPay-Timestamp` | Unix epoch |
+| `X-NTXPay-Delivery` | UUID |
+
+## Comportamiento
+
+- **At-least-once**: puedes recibir `CONFIRMED` más de una vez. Deduplica por `transaction.id`.
+- **Falla después del éxito**: no ocurre. Una transacción no cambia de `CONFIRMED` a `FAILED`.
+- **Reversa**: si la contraparte (beneficiario) devuelve, recibes un evento `refund_in` separado, con `transaction.type = "refund_in"` linkado por el `externalId`.
+
+## Respuesta Esperada
+
+```http
+HTTP/1.1 200 OK
+```
+
+Ver el [guía de implementación](/es/guides/webhooks/implementation) para la validación HMAC.

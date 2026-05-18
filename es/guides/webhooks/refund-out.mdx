@@ -1,0 +1,59 @@
+---
+title: 'Evento refund_out'
+description: 'Notificación de estorno enviado — devolviste una transacción cash-in recibida'
+---
+
+## Cuándo dispara
+
+El evento `refund_out` se dispara cuando un **cash-in que recibiste es devuelto al pagador**. El saldo correspondiente se debita de tu cuenta.
+
+Escenarios comunes:
+
+- Accionaste un estorno por motivo de fraude o error
+- El cliente solicitó cancelación dentro del plazo SPEI
+- Disputa OXXO en la que NTX Pay devuelve el valor
+
+## Payload
+
+```json
+{
+  "event": "refund_out",
+  "deliveryId": "7d2c9e8f-5b34-4c19-aa18-99b3c4d5e6f7",
+  "createdAt": "2026-05-14T11:45:00.000Z",
+  "transaction": {
+    "id": 78901,
+    "externalId": "order-abc-123-refund",
+    "paymentMethod": "SPEI",
+    "direction": "out",
+    "type": "refund_out",
+    "status": "CONFIRMED",
+    "provider": "smartfastpay",
+    "amountCentavos": 50000,
+    "clabe": "012180001234567890",
+    "createdAt": "2026-05-14T11:44:50.000Z",
+    "confirmedAt": "2026-05-14T11:45:00.000Z"
+  },
+  "originalTransactionId": 12345
+}
+```
+
+`originalTransactionId` apunta al `id` del cash-in original que fue devuelto.
+
+## Respuesta Esperada
+
+`HTTP 200 OK`.
+
+## Procesamiento Recomendado
+
+```typescript
+if (event.event === 'refund_out') {
+  // Saldo ya debitado
+  await marcarPedidoComoEstornado({
+    originalCashInId: event.originalTransactionId,
+    refundId: event.transaction.id,
+    valor: event.transaction.amountCentavos,
+  });
+}
+```
+
+Ver el [guía de implementación](/es/guides/webhooks/implementation) para validación HMAC.

@@ -1,0 +1,128 @@
+---
+title: 'Setup de Webhooks'
+description: 'Configura URLs de webhook programáticamente para SPEI y OXXO'
+---
+
+## Visión General
+
+La configuración de webhooks se hace vía tres endpoints:
+
+- `GET /api/webhooks-config` — listar webhooks activos
+- `POST /api/webhooks-config` — crear/configurar un webhook
+- `DELETE /api/webhooks-config/{id}` — remover un webhook
+
+## Crear Webhook
+
+### Request
+
+```bash
+curl -X POST https://api.ntxpay.com/api/webhooks-config \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://mi-servidor.com/webhooks/ntxpay",
+    "events": ["cash_in", "cash_out"],
+    "secret": "whsec_abc123def456"
+  }'
+```
+
+### Response (201)
+
+```json
+{
+  "id": 42,
+  "url": "https://mi-servidor.com/webhooks/ntxpay",
+  "events": ["cash_in", "cash_out"],
+  "isActive": true,
+  "secret": "whsec_abc123def456"
+}
+```
+
+<Warning>
+  Si omites `secret` en el request, NTX Pay genera uno automáticamente y lo retorna en la respuesta — **guárdalo de inmediato**, no se muestra nuevamente.
+</Warning>
+
+### Campos
+
+<ParamField path="url" type="string" required>
+  URL HTTPS del endpoint que recibirá los webhooks. **HTTP simple es rechazado.**
+</ParamField>
+
+<ParamField path="events" type="array" required>
+  Lista de 1 a 5 eventos. Valores aceptados: `cash_in`, `cash_out`, `refund_in`, `refund_out`, `internal_transfer`.
+</ParamField>
+
+<ParamField path="secret" type="string">
+  Secret HMAC para validar firma. Mínimo 8 caracteres, máximo 128. Si se omite, NTX Pay lo genera.
+</ParamField>
+
+## Listar Webhooks
+
+```bash
+curl -X GET https://api.ntxpay.com/api/webhooks-config \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+```json
+{
+  "accountId": 93,
+  "webhooks": [
+    {
+      "id": 42,
+      "url": "https://mi-servidor.com/webhooks/ntxpay",
+      "events": ["cash_in", "cash_out"],
+      "isActive": true,
+      "createdAt": "2026-05-01T10:30:00.000Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+<Info>
+  La respuesta del listado **no** incluye el `secret` — solo se muestra al crear.
+</Info>
+
+## Remover Webhook
+
+```bash
+curl -X DELETE https://api.ntxpay.com/api/webhooks-config/42 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+```json
+{
+  "success": true,
+  "message": "Webhook removido exitosamente"
+}
+```
+
+## Múltiples Webhooks
+
+Puedes configurar **varios webhooks** simultáneamente, cada uno con su conjunto de eventos. Útil para:
+
+- Separar **logs/auditoría** (recibe todos los eventos) de **procesamiento** (solo `cash_in`/`cash_out`)
+- Ambiente de **homologación interna** vs producción
+- Múltiples servicios consumiendo eventos diferentes
+
+## Probando el Endpoint
+
+Antes de configurar en producción, valida tu endpoint:
+
+1. Configura en sandbox primero
+2. Usa [webhook.site](https://webhook.site) o [ngrok](https://ngrok.com) para inspeccionar el tráfico
+3. Confirma que tu aplicación:
+   - Valida `X-NTXPay-Signature` correctamente
+   - Retorna `200` en menos de 10 segundos
+   - Deduplica por `X-NTXPay-Delivery`
+
+## Próximos Pasos
+
+<CardGroup cols={2}>
+  <Card title="Implementación" href="/es/guides/webhooks/implementation">
+    Validación HMAC en Node, Python y PHP
+  </Card>
+  <Card title="Eventos" href="/es/guides/webhooks/cash-in">
+    Payload de cada tipo de evento
+  </Card>
+</CardGroup>

@@ -1,0 +1,57 @@
+---
+title: 'Primeiros Passos'
+description: 'Boas-vindas à API NTX Pay México. Este guia te leva pelos primeiros passos para integrar e começar a usar SPEI e OXXO.'
+---
+
+## Visão Geral
+
+A API NTX Pay México permite que sua empresa realize operações de pagamento, consulte saldos, reconcilie transações e receba notificações por webhooks — tudo de forma segura e escalável. A autenticação é via **certificado X.509 (mTLS) + OAuth 2.0**, retornando um **JWT** de curta duração para cada requisição.
+
+## Passo a Passo no Sandbox
+
+<Steps>
+  <Step title="Solicite uma conta sandbox">
+    Contate seu gerente de conta ou escreva para `contact@ntxpay.com` solicitando uma conta sandbox.
+  </Step>
+  <Step title="Receba suas credenciais">
+    Você receberá um **certificado** e as **credenciais OAuth** (`clientId` + `clientSecret`) associadas à conta sandbox.
+  </Step>
+  <Step title="Registre a URL do webhook">
+    Registre a URL do seu webhook via `POST /api/webhooks-config` para receber eventos simulados.
+
+    ```bash
+    curl -X POST https://sandbox.ntxpay.com/api/webhooks-config \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "url": "https://meu-servidor.com/webhooks/ntxpay",
+        "events": ["cash_in", "cash_out"]
+      }'
+    ```
+  </Step>
+  <Step title="Autentique e simule cenários">
+    Autentique, faça chamadas à API e use o header `X-Sandbox-Scenario` para simular diferentes resultados (confirmação imediata, falha, expiração, etc.).
+
+    ```bash
+    curl -X POST https://sandbox.ntxpay.com/api/spei/cash-in \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "X-Sandbox-Scenario: error:insufficient-funds" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "amountCentavos": 50000,
+        "externalId": "pedido-001",
+        "customerName": "Juan Perez"
+      }'
+    ```
+  </Step>
+</Steps>
+
+## Ambiente
+
+| Ambiente | URL | Provider |
+|---|---|---|
+| Sandbox | `https://sandbox.ntxpay.com` | `sandbox` (transações simuladas) |
+
+## Suporte
+
+`support@ntxpay.com`

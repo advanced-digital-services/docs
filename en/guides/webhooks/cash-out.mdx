@@ -1,0 +1,80 @@
+---
+title: 'cash_out event'
+description: 'Notification sent when a SPEI cash-out is settled or fails'
+---
+
+## When it fires
+
+The `cash_out` event fires in two scenarios:
+
+- **Success** — the SPEI cash-out sent via `POST /api/spei/cash-out` was settled at Banxico (`status: CONFIRMED`)
+- **Failure** — the SPEI network or the provider rejected the transfer (`status: FAILED`)
+
+## Payload (confirmed)
+
+```json
+{
+  "event": "cash_out",
+  "deliveryId": "1a3f9e8d-2c47-4b9c-aa18-77a2b3c4d5e6",
+  "createdAt": "2026-05-13T12:00:42.000Z",
+  "transaction": {
+    "id": 56789,
+    "externalId": "payout-001",
+    "paymentMethod": "SPEI",
+    "direction": "out",
+    "type": "cash_out",
+    "status": "CONFIRMED",
+    "provider": "smartfastpay",
+    "amountCentavos": 50000,
+    "clabe": "012180001234567890",
+    "createdAt": "2026-05-13T12:00:00.000Z",
+    "confirmedAt": "2026-05-13T12:00:42.000Z"
+  }
+}
+```
+
+## Payload (failure)
+
+```json
+{
+  "event": "cash_out",
+  "deliveryId": "...",
+  "createdAt": "2026-05-13T12:01:00.000Z",
+  "transaction": {
+    "id": 56789,
+    "status": "FAILED",
+    "paymentMethod": "SPEI",
+    "direction": "out",
+    "type": "cash_out",
+    "amountCentavos": 50000,
+    "clabe": "012180001234567890",
+    "createdAt": "2026-05-13T12:00:00.000Z",
+    "confirmedAt": null
+  }
+}
+```
+
+When `status: FAILED`, the blocked balance is automatically released.
+
+## Headers
+
+| Header | Value |
+|---|---|
+| `X-NTXPay-Event` | `cash_out` |
+| `X-NTXPay-Signature` | `sha256=<hmac>` |
+| `X-NTXPay-Timestamp` | Unix epoch |
+| `X-NTXPay-Delivery` | UUID |
+
+## Behavior
+
+- **At-least-once**: you may receive `CONFIRMED` more than once. Deduplicate by `transaction.id`.
+- **Failure after success**: doesn't happen. A transaction won't move from `CONFIRMED` to `FAILED`.
+- **Reversal**: if the counterparty (beneficiary) returns, you receive a separate `refund_in` event, with `transaction.type = "refund_in"` linked by the `externalId`.
+
+## Expected Response
+
+```http
+HTTP/1.1 200 OK
+```
+
+See the [implementation guide](/en/guides/webhooks/implementation) for HMAC validation.

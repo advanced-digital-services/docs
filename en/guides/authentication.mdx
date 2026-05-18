@@ -1,0 +1,123 @@
+---
+title: 'Authentication'
+description: 'X.509 certificate (mTLS) + OAuth 2.0 client_credentials to get an access JWT'
+---
+
+## Overview
+
+The NTX Pay México API uses two-layer authentication:
+
+1. **X.509 certificate (mTLS)** — delivered by NTX Pay at onboarding, proves the client server's identity.
+2. **OAuth 2.0 client_credentials** — `clientId` + `clientSecret` received at signup, validated together with the certificate.
+
+The combination returns a **JWT** (10-minute validity) used in the other endpoints as `Authorization: Bearer ...`.
+
+## Endpoint
+
+### POST /api/auth/token
+
+#### Required Headers
+
+```
+X-SSL-Client-Cert: <PEM-URL-encoded>
+Content-Type: application/json
+```
+
+The `X-SSL-Client-Cert` is typically injected by NGINX/ALB with the URL-encoded certificate:
+
+```nginx
+proxy_set_header X-SSL-Client-Cert $ssl_client_escaped_cert;
+```
+
+In development, URL-encode manually:
+
+```bash
+ENCODED_CERT=$(cat client.cert.pem | python3 -c "import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read()))")
+```
+
+#### Request
+
+```bash
+curl -X POST https://api.ntxpay.com/api/auth/token \
+  -H "X-SSL-Client-Cert: $ENCODED_CERT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "clientId": "qr-93-550e8400",
+    "clientSecret": "a1b2c3d4e5f6g7h8"
+  }'
+```
+
+#### Response (201)
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 600,
+  "scope": "email profile"
+}
+```
+
+## Using the Token
+
+Include the `access_token` in all authenticated requests:
+
+```bash
+curl -X GET https://api.ntxpay.com/api/balance \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+## Renewal
+
+The token expires in **10 minutes (600s)**. Repeat step 1 before expiration — there is no refresh token.
+
+<Warning>
+  Don't cache the token across processes without an invalidation mechanism. Under high load, generate one token per worker and renew every ~8 minutes to avoid `401` due to expiration.
+</Warning>
+
+## Common Errors
+
+| Code | Cause | Solution |
+|---|---|---|
+| `400` | Missing `X-SSL-Client-Cert` | Configure NGINX/ALB to forward the certificate |
+| `400` | Malformed PEM | Verify that the certificate starts with `-----BEGIN CERTIFICATE-----` |
+| `401` | Invalid `clientId`/`clientSecret` | Re-check credentials (no trailing spaces) |
+| `401` | Expired/revoked certificate | Request renewal from NTX Pay |
+
+## Node.js Example
+
+```typescript
+import fs from 'fs';
+import axios from 'axios';
+
+const cert = fs.readFileSync('client.cert.pem', 'utf-8');
+const encodedCert = encodeURIComponent(cert);
+
+async function getToken(): Promise<string> {
+  const { data } = await axios.post(
+    'https://api.ntxpay.com/api/auth/token',
+    {
+      clientId: process.env.NTXPAY_CLIENT_ID,
+      clientSecret: process.env.NTXPAY_CLIENT_SECRET,
+    },
+    {
+      headers: {
+        'X-SSL-Client-Cert': encodedCert,
+        'Content-Type': 'application/json',
+      },
+    },
+  );
+  return data.access_token;
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" href="/en/guides/quickstart">
+    Full flow (signup → token → transaction)
+  </Card>
+  <Card title="Balance Query" href="/en/guides/balance">
+    Use the token to query the balance
+  </Card>
+</CardGroup>

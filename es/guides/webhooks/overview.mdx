@@ -1,0 +1,67 @@
+---
+title: 'Visión General de Webhooks'
+description: 'Notificaciones automáticas para eventos SPEI y OXXO'
+---
+
+## Qué son los Webhooks
+
+Los webhooks permiten que NTX Pay envíe notificaciones HTTPS a tu servidor siempre que ocurre un evento relevante — confirmación de cash-in, falla de cash-out, etc. — sin que tengas que hacer polling en `GET /api/transactions`.
+
+## Eventos Disponibles
+
+| Evento | Cuándo dispara |
+|---|---|
+| `cash_in` | SPEI cash-in confirmado **o** OXXO cash-in pagado en caja |
+| `cash_out` | SPEI cash-out liquidado |
+| `refund_in` | Estorno **recibido** (una transacción cash-out tuya fue devuelta) |
+| `refund_out` | Estorno **enviado** (devolviste un cash-in) |
+| `internal_transfer` | Transferencia interna entre cuentas NTX Pay |
+
+## Configuración
+
+Endpoint: `POST /api/webhooks-config`. Proporcionas:
+
+- **`url`** — endpoint HTTPS en tu servidor
+- **`events`** — array con 1 a 5 eventos
+- **`secret`** — opcional. Si se omite, NTX Pay genera uno automáticamente y lo retorna en la respuesta.
+
+Ver el [guía de Setup](/es/guides/webhooks/setup) para el paso a paso.
+
+## Seguridad — Firma HMAC
+
+Todo webhook se firma con HMAC-SHA256 usando el `secret`. Headers enviados:
+
+| Header | Contenido |
+|---|---|
+| `X-NTXPay-Signature` | `sha256=<hex-hmac>` del cuerpo crudo |
+| `X-NTXPay-Timestamp` | timestamp Unix del envío |
+| `X-NTXPay-Event` | nombre del evento (`cash_in`, etc.) |
+| `X-NTXPay-Delivery` | UUID único del envío (úsalo para dedupe) |
+
+**Siempre valida la firma** antes de procesar — sin eso, cualquier persona puede falsificar notificaciones.
+
+## Garantías de Entrega
+
+- **At-least-once**: puedes recibir el mismo evento más de una vez. Usa `X-NTXPay-Delivery` para deduplicar.
+- **Retries**: hasta 5 intentos en backoff exponencial si respondes con status distinto de `2xx`.
+- **Timeout**: 10 segundos. Responde rápido — procesa asíncronamente si es necesario.
+- **Order**: los eventos llegan **fuera de orden** en condiciones de error. Confiere `createdAt` en el payload.
+
+## Prácticas Recomendadas
+
+1. **Responde `200` inmediatamente** tras validar la firma y encolar el evento.
+2. **Deduplica por `X-NTXPay-Delivery`** o `transaction.id`.
+3. **Idempotencia**: procesa `cash_in` confirmado para el mismo `externalId` una sola vez.
+4. **Re-consulta** `/api/transactions` si tienes duda sobre el estado — el webhook es una optimización, no la fuente de verdad.
+5. **HTTPS obligatorio** — los webhooks solo se envían a URLs con protocolo HTTPS.
+
+## Próximos Pasos
+
+<CardGroup cols={2}>
+  <Card title="Setup de Webhook" href="/es/guides/webhooks/setup">
+    Configura el endpoint en tu cuenta
+  </Card>
+  <Card title="Implementación" href="/es/guides/webhooks/implementation">
+    Ejemplos en Node, Python y PHP de validación HMAC
+  </Card>
+</CardGroup>

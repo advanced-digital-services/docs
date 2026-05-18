@@ -1,0 +1,167 @@
+---
+title: 'Webhook Implementation'
+description: 'HMAC validation and idempotent processing in Node, Python and PHP'
+---
+
+## Principles
+
+Any webhook implementation needs to cover 3 things:
+
+1. **HMAC validation** with the `secret` received when creating the webhook
+2. **Fast response** (`200 OK` in ≤10s)
+3. **Idempotency** via `X-NTXPay-Delivery` or `transaction.id`
+
+## Node.js / Express
+
+```typescript
+import express from 'express';
+import crypto from 'crypto';
+
+const app = express();
+
+// CRITICAL: use raw body, not parsed JSON, so the HMAC matches
+app.use('/webhooks/ntxpay', express.raw({ type: 'application/json' }));
+
+const SECRET = process.env.NTXPAY_WEBHOOK_SECRET!;
+const seen = new Set<string>(); // production: Redis with TTL
+
+app.post('/webhooks/ntxpay', async (req, res) => {
+  const sig = req.header('X-NTXPay-Signature') ?? '';
+  const deliveryId = req.header('X-NTXPay-Delivery') ?? '';
+
+  const expected = 'sha256=' + crypto
+    .createHmac('sha256', SECRET)
+    .update(req.body)
+    .digest('hex');
+
+  if (sig.length !== expected.length ||
+      !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+    return res.status(401).end();
+  }
+
+  // Dedupe
+  if (seen.has(deliveryId)) return res.json({ duplicate: true });
+  seen.add(deliveryId);
+
+  const event = JSON.parse(req.body.toString());
+
+  // Process async — don't block the response
+  enqueue(event).catch(console.error);
+
+  res.json({ received: true });
+});
+```
+
+## Python / Flask
+
+```python
+import hmac
+import hashlib
+from flask import Flask, request, abort, jsonify
+
+app = Flask(__name__)
+SECRET = b'<your-webhook-secret>'
+seen = set()  # production: Redis with TTL
+
+@app.post('/webhooks/ntxpay')
+def webhook():
+    raw = request.get_data()  # raw bytes
+    sig = request.headers.get('X-NTXPay-Signature', '')
+    delivery_id = request.headers.get('X-NTXPay-Delivery', '')
+
+    expected = 'sha256=' + hmac.new(SECRET, raw, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        abort(401)
+
+    if delivery_id in seen:
+        return jsonify(duplicate=True)
+    seen.add(delivery_id)
+
+    event = request.get_json()
+    # enqueue asynchronously
+    enqueue(event)
+
+    return jsonify(received=True)
+```
+
+## PHP
+
+```php
+<?php
+$secret = getenv('NTXPAY_WEBHOOK_SECRET');
+
+$raw = file_get_contents('php://input');
+$signature = $_SERVER['HTTP_X_NTXPAY_SIGNATURE'] ?? '';
+$deliveryId = $_SERVER['HTTP_X_NTXPAY_DELIVERY'] ?? '';
+
+$expected = 'sha256=' . hash_hmac('sha256', $raw, $secret);
+
+if (!hash_equals($signature, $expected)) {
+    http_response_code(401);
+    exit;
+}
+
+// Dedupe (use Redis in production)
+if (isset($_SESSION['seen'][$deliveryId])) {
+    echo json_encode(['duplicate' => true]);
+    exit;
+}
+$_SESSION['seen'][$deliveryId] = true;
+
+$event = json_decode($raw, true);
+
+// Queue async processing
+// processAsync($event);
+
+http_response_code(200);
+echo json_encode(['received' => true]);
+```
+
+## Why raw body?
+
+HMAC is computed over the **exact bytes** NTX Pay sent. If the framework parses JSON before (reordering whitespace, fields), the signature won't match. Always capture the raw body in **bytes** before parsing.
+
+## Events by Status
+
+Filter before processing:
+
+```typescript
+const event = JSON.parse(req.body.toString());
+
+switch (event.event) {
+  case 'cash_in':
+    if (event.transaction.status === 'CONFIRMED') {
+      await markOrderPaid(event.transaction.externalId);
+    }
+    break;
+
+  case 'cash_out':
+    if (event.transaction.status === 'CONFIRMED') {
+      await markPayoutSettled(event.transaction.id);
+    } else if (event.transaction.status === 'FAILED') {
+      await markPayoutFailed(event.transaction.id);
+    }
+    break;
+
+  case 'refund_in':
+  case 'refund_out':
+    await processRefund(event);
+    break;
+}
+```
+
+## Retries
+
+If you return a non-`2xx` status, NTX Pay retries up to **5 times** in exponential backoff (~30s, 1m, 5m, 15m, 1h). After that, the event is dropped. To resend manually, use the panel or contact support.
+
+<Warning>
+  Don't use `429` to signal your own service's rate-limit — it triggers retry and amplifies load. Respond `503 Service Unavailable` if you really can't process.
+</Warning>
+
+## Best Practices
+
+- **Use Redis/DB for dedupe** with TTL ≥ 24h (not in-process memory)
+- **Process async**: webhook handler just validates + enqueues
+- **Monitor latency** of the handler — target P95 < 500ms
+- **Log `X-NTXPay-Delivery`** for auditing
+- **Re-query `/api/transactions`** if the webhook brings state conflicting with your DB

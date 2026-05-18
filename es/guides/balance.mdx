@@ -1,0 +1,115 @@
+---
+title: 'Consulta de Saldo'
+description: 'Saldo disponible y pendiente de la cuenta en centavos MXN'
+---
+
+## Visión General
+
+El endpoint `GET /api/balance` retorna el saldo de la cuenta autenticada en **centavos MXN** (enteros). Hay dos campos:
+
+- **`availableCentavos`** — saldo disponible para enviar SPEI cash-out
+- **`pendingCentavos`** — saldo bloqueado (cash-out en procesamiento, cash-in confirmando)
+
+## Endpoint
+
+### GET /api/balance
+
+#### Headers
+
+```
+Authorization: Bearer {token}
+```
+
+#### Request
+
+```bash
+curl -X GET https://api.ntxpay.com/api/balance \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+#### Response (200)
+
+```json
+{
+  "availableCentavos": 4873490,
+  "pendingCentavos": 0,
+  "currency": "MXN"
+}
+```
+
+`4873490` centavos = **$48 734.90 MXN**.
+
+## Estructura de la Respuesta
+
+<ResponseField name="availableCentavos" type="integer">
+  Saldo disponible en centavos MXN. Úsalo para validar antes de un cash-out.
+</ResponseField>
+
+<ResponseField name="pendingCentavos" type="integer">
+  Saldo pendiente en centavos MXN. Incluye cash-out en procesamiento y cash-in aguardando confirmación final del provider.
+</ResponseField>
+
+<ResponseField name="currency" type="string">
+  Siempre `MXN` en el scope México.
+</ResponseField>
+
+## Ejemplo Node.js
+
+```typescript
+import axios from 'axios';
+
+async function getBalance(token: string) {
+  const { data } = await axios.get('https://api.ntxpay.com/api/balance', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const availableMXN = (data.availableCentavos / 100).toFixed(2);
+  const pendingMXN = (data.pendingCentavos / 100).toFixed(2);
+
+  console.log(`Disponible: $${availableMXN} MXN`);
+  console.log(`Pendiente:  $${pendingMXN} MXN`);
+  return data;
+}
+```
+
+## Validación Antes de Cash-Out
+
+```typescript
+async function safeSpeiCashOut(amountCentavos: number, token: string, dto: any) {
+  const balance = await getBalance(token);
+
+  if (balance.availableCentavos < amountCentavos) {
+    throw new Error(
+      `Saldo insuficiente: disponible ${balance.availableCentavos}, ` +
+      `solicitado ${amountCentavos} (en centavos)`,
+    );
+  }
+
+  return axios.post('https://api.ntxpay.com/api/spei/cash-out', dto, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+```
+
+<Info>
+  Aún validando el saldo antes, el cash-out puede fallar con `400` si otro cash-out simultáneo consume el saldo. Trata el error `400` como "saldo insuficiente" en el momento de la llamada.
+</Info>
+
+## Códigos de Respuesta
+
+| Código | Significado |
+|---|---|
+| `200` | Saldo consultado |
+| `401` | Token inválido o ausente |
+| `502` | `account-ms` no disponible |
+
+## Próximos Pasos
+
+<CardGroup cols={2}>
+  <Card title="SPEI Cash-Out" href="/es/guides/spei-cash-out">
+    Envía una transferencia SPEI usando el saldo disponible
+  </Card>
+  <Card title="Transacciones" href="/es/guides/transactions-list">
+    Consulta el historial de movimientos
+  </Card>
+</CardGroup>

@@ -1,0 +1,55 @@
+---
+title: 'Postman Collections'
+description: 'Importe a coleção oficial do Postman para testar a API NTX Pay localmente.'
+---
+
+## Como obter a coleção
+
+A coleção oficial do Postman com todos os endpoints públicos da NTX Pay México é distribuída sob demanda. Solicite o arquivo `.json` (Postman v2.1) por e-mail para `support@ntxpay.com`.
+
+## Importar no Postman
+
+1. Abra o Postman
+2. **File → Import**
+3. Selecione o arquivo `.json` recebido
+4. Importe também o environment fornecido e escolha **Sandbox** para iniciar os testes
+
+## Configurar Variáveis do Environment
+
+O environment espera 3 variáveis:
+
+| Variável | Descrição | Exemplo |
+|---|---|---|
+| `clientId` | OAuth client_id da sua conta | `qr-93-550e8400` |
+| `clientSecret` | OAuth client_secret | `a1b2c3d4...` |
+| `certificatePem` | Certificado X.509 em uma única linha (sem quebras, com `\n` literal) | `-----BEGIN CERTIFICATE-----\n...` |
+
+## Fluxo Sugerido
+
+A coleção está organizada na ordem típica de uso:
+
+1. **Auth → Generate Token** — execute primeiro. O response salva automaticamente o `access_token` em uma variável de environment.
+2. **Balance → Get Balance** — confirma que o token está funcionando.
+3. **SPEI → Cash-In** — cria uma cobrança simulada.
+4. **Transactions → List** — consulta o estado.
+
+## Pastas Disponíveis
+
+- `Auth` — geração de JWT
+- `Account` — signup e consulta de saldo
+- `SPEI` — cash-in, cash-out, get transaction by externalId
+- `OXXO` — cash-in
+- `Transactions` — listar
+- `Webhooks Config` — listar, criar, deletar
+
+## Alternativas
+
+Prefere outra ferramenta?
+
+- **Insomnia**: importe o mesmo `.json` (compatível com Postman v2.1)
+- **OpenAPI / Bruno**: use nosso [`openapi.json`](/api-reference/openapi.json) diretamente
+- **cURL**: toda página de endpoint nessa documentação tem um exemplo cURL pronto pra copiar
+
+## Suporte
+
+`support@ntxpay.com`

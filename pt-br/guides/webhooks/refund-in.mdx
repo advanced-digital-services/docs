@@ -1,0 +1,59 @@
+---
+title: 'Evento refund_in'
+description: 'Notificação de estorno recebido — uma transferência cash-out sua foi devolvida'
+---
+
+## Quando dispara
+
+O evento `refund_in` é disparado quando uma transação **cash-out enviada por você** é devolvida pela contraparte. O saldo correspondente é creditado de volta na sua conta.
+
+Cenários comuns:
+
+- Beneficiário rejeitou a transferência manualmente
+- CLABE existia mas conta foi encerrada após a confirmação inicial
+- Estorno solicitado pelo beneficiário dentro do prazo SPEI
+
+## Payload
+
+```json
+{
+  "event": "refund_in",
+  "deliveryId": "5b9c2d8e-4f12-4a18-bb29-88a3b4c5d6f7",
+  "createdAt": "2026-05-14T09:15:00.000Z",
+  "transaction": {
+    "id": 67890,
+    "externalId": "payout-001-refund",
+    "paymentMethod": "SPEI",
+    "direction": "in",
+    "type": "refund_in",
+    "status": "CONFIRMED",
+    "provider": "smartfastpay",
+    "amountCentavos": 50000,
+    "clabe": "012180001234567890",
+    "createdAt": "2026-05-14T09:14:50.000Z",
+    "confirmedAt": "2026-05-14T09:15:00.000Z"
+  },
+  "originalTransactionId": 56789
+}
+```
+
+O campo `originalTransactionId` aponta para o `id` do cash-out original que foi estornado. Use para correlacionar.
+
+## Resposta Esperada
+
+`HTTP 200 OK` em até 10 segundos.
+
+## Processamento Recomendado
+
+```typescript
+if (event.event === 'refund_in') {
+  // Crédito do saldo já aconteceu automaticamente
+  await marcarPagoutComoEstornado({
+    originalId: event.originalTransactionId,
+    refundId: event.transaction.id,
+    valor: event.transaction.amountCentavos,
+  });
+}
+```
+
+Veja o [guia de implementação](/api-reference/guides/webhooks/implementation) para validação HMAC.

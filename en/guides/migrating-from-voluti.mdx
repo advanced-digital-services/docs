@@ -1,0 +1,224 @@
+---
+title: 'Migrating from Voluti SPEI'
+description: 'Step-by-step to move your integration from Voluti SPEI (Magen Pay) to NTX Pay México with minimal changes'
+---
+
+## Overview
+
+The NTX Pay México API was designed so that customers coming from **Voluti SPEI** (`api.spei.magenpay.io`) can migrate with minimal code changes:
+
+- **Field aliases** — `payer_name`, `receiverName`, `conciliationId`, `bankCode`, etc. remain accepted
+- **amount as string** — `"100.00"` still valid (we convert to centavos internally)
+- **Equivalent get-transaction endpoint** — `GET /api/spei/transaction/{externalId}` instead of `GET /api/v1/transaction/{conciliationId}/conciliation`
+- **16-digit CLABE** (debit card) accepted on cash-out
+- **Auth changes** — Voluti uses HMAC `API_KEY:NONCE:SIGNATURE`; NTX Pay uses **X.509 certificate (mTLS) + OAuth 2.0 → JWT Bearer**. This is the biggest change.
+
+## 1. Base URL & Auth
+
+| Item | Voluti | NTX Pay |
+|---|---|---|
+| Production host | `api.spei.magenpay.io` | `api.ntxpay.com` |
+| Sandbox host | — | `sandbox.ntxpay.com` |
+| Versioning | `/api/v1` | `/api` |
+| Auth header | `Authorization: API_KEY:NONCE:SIGNATURE` | `Authorization: Bearer <JWT>` |
+| Credential issuance | API key + secret from panel | `POST /api/signup` → `clientId/clientSecret`; then `POST /api/auth/token` with cert X.509 |
+
+For auth, see [Authentication](/en/guides/authentication).
+
+## 2. Endpoint Map
+
+| Voluti | NTX Pay |
+|---|---|
+| `POST /api/v1/transaction/cashin` | `POST /api/spei/cash-in` |
+| `POST /api/v1/transaction/cashout` | `POST /api/spei/cash-out` |
+| `GET /api/v1/transaction/balance` | `GET /api/balance` |
+| `GET /api/v1/transaction/{conciliationId}/conciliation` | `GET /api/spei/transaction/{externalId}` |
+| `POST /webhooks/subscribe` | `POST /api/webhooks-config` |
+
+## 3. Cash-In Payload
+
+You can keep the payload **exactly as you send it to Voluti** — we accept the same fields as aliases:
+
+```bash
+# Voluti
+curl -X POST https://api.spei.magenpay.io/api/v1/transaction/cashin \
+  -H "Authorization: API_KEY:NONCE:SIGNATURE" \
+  -d '{
+    "amount": "100.00",
+    "payer_name": "Juan Perez",
+    "conciliationId": "order_abc_123",
+    "generateCheckout": true
+  }'
+
+# NTX Pay — IDENTICAL payload works
+curl -X POST https://api.ntxpay.com/api/spei/cash-in \
+  -H "Authorization: Bearer $JWT" \
+  -d '{
+    "amount": "100.00",
+    "payer_name": "Juan Perez",
+    "conciliationId": "order_abc_123"
+  }'
+```
+
+Internally we convert to the canonical format:
+- `amount: "100.00"` → `amountCentavos: 10000`
+- `payer_name` → `customerName`
+- `conciliationId` → `externalId`
+- `generateCheckout` is ignored — we always return `checkoutUrl` when applicable
+
+When ready, we recommend migrating to the canonical format:
+
+```json
+{
+  "amountCentavos": 10000,
+  "customerName": "Juan Perez",
+  "externalId": "order-abc-123"
+}
+```
+
+The response always includes `conciliationId` (mirroring `externalId`) to ease client-side parsing during the transition.
+
+## 4. Cash-Out Payload
+
+Same strategy. Accepted aliases:
+
+| Voluti | NTX Pay canonical | Accepted as alias? |
+|---|---|---|
+| `amount: "10.00"` (string) | `amountCentavos: 1000` | yes |
+| `receiverName` | `beneficiaryName` | yes |
+| `receiverClabe` (18 or 16) | `destinationClabe` (18 or 16) | yes |
+| `bankCode` | — (not used) | yes, accepted-and-ignored |
+| `conciliationId` | `externalId` | yes |
+
+**16-digit CLABE** (debit card) is accepted in NTX Pay.
+
+```bash
+# Voluti
+curl -X POST https://api.spei.magenpay.io/api/v1/transaction/cashout \
+  -d '{
+    "amount": "100.00",
+    "receiverName": "Maria Lopez",
+    "receiverClabe": "012180001234567890",
+    "bankCode": "002",
+    "conciliationId": "payout_001"
+  }'
+
+# NTX Pay — same payload accepted
+curl -X POST https://api.ntxpay.com/api/spei/cash-out \
+  -H "Authorization: Bearer $JWT" \
+  -d '{
+    "amount": "100.00",
+    "receiverName": "Maria Lopez",
+    "receiverClabe": "012180001234567890",
+    "bankCode": "002",
+    "conciliationId": "payout_001"
+  }'
+```
+
+## 5. Transaction Query (polling)
+
+The dedicated endpoint keeps 1-to-1 semantics with Voluti's `conciliation`:
+
+```bash
+# Voluti
+curl -X GET https://api.spei.magenpay.io/api/v1/transaction/order_abc_123/conciliation
+
+# NTX Pay
+curl -X GET https://api.ntxpay.com/api/spei/transaction/order_abc_123 \
+  -H "Authorization: Bearer $JWT"
+```
+
+Returns a single record. The difference is the response schema — see [`GET /api/spei/transaction/{externalId}`](/en/endpoints/spei-transaction).
+
+## 6. Balance
+
+```bash
+# Voluti
+GET /api/v1/transaction/balance
+
+# NTX Pay
+GET /api/balance
+```
+
+Response structure:
+
+```json
+// NTX Pay
+{
+  "availableCentavos": 4873490,
+  "pendingCentavos": 0,
+  "currency": "MXN"
+}
+```
+
+To convert to the format you used with Voluti (decimal string), divide by 100.
+
+## 7. Webhooks
+
+Voluti accepts 3 separate URLs (`default_url`, `cashin_url`, `cashout_url`). In NTX Pay, you create **one webhook per configuration** with the list of events it should receive:
+
+```bash
+# Voluti
+POST /webhooks/subscribe
+{
+  "default_url": "https://my-server.com/webhooks",
+  "cashin_url": "https://my-server.com/webhooks/cashin",
+  "cashout_url": "https://my-server.com/webhooks/cashout"
+}
+
+# NTX Pay — one config per URL
+POST /api/webhooks-config
+{ "url": "https://my-server.com/webhooks/cashin", "events": ["cash_in"] }
+
+POST /api/webhooks-config
+{ "url": "https://my-server.com/webhooks/cashout", "events": ["cash_out", "refund_in", "refund_out"] }
+```
+
+HMAC validation continues, but with different headers:
+
+| Voluti | NTX Pay |
+|---|---|
+| Signature header not publicly documented | `X-NTXPay-Signature: sha256=<hex>` |
+| — | `X-NTXPay-Timestamp`, `X-NTXPay-Delivery`, `X-NTXPay-Event` |
+
+Details in [Webhook Implementation](/en/guides/webhooks/implementation).
+
+## 8. Migration Checklist
+
+<Steps>
+  <Step title="Onboarding">
+    Create the account with `POST /api/signup` (use `isSandbox: true` for tests). Store `clientId` + `clientSecret`.
+  </Step>
+  <Step title="Receive the certificate">
+    Request the X.509 (mTLS) certificate from NTX Pay for the corresponding environment (sandbox / production).
+  </Step>
+  <Step title="Swap the auth">
+    Replace the HMAC header assembly with the `POST /api/auth/token` flow (cert + clientId/clientSecret) → cache the JWT for ~10 minutes.
+  </Step>
+  <Step title="Swap the host">
+    From `api.spei.magenpay.io` → `api.ntxpay.com`. Payloads remain the same (aliases accepted).
+  </Step>
+  <Step title="Reconfigure webhooks">
+    Create 1 or more `POST /api/webhooks-config`. Adjust your handler to validate the NTX Pay HMAC (header `X-NTXPay-Signature`).
+  </Step>
+  <Step title="Migrate to canonical (optional)">
+    After stabilizing, swap `amount` for `amountCentavos`, `payer_name` for `customerName`, etc. Not mandatory — aliases remain accepted.
+  </Step>
+</Steps>
+
+## Known limitations
+
+- **`generateCheckout`** — ignored. We always return `checkoutUrl` in the response when applicable.
+- **`bankCode`** — accepted but ignored. The 18-digit CLABE already carries the bank ISPB.
+- **HMAC API_KEY:NONCE:SIGNATURE** — we don't support that scheme. Auth is strictly mTLS + JWT.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" href="/en/guides/authentication">
+    How to get the JWT (X.509 + OAuth)
+  </Card>
+  <Card title="GET /spei/transaction" href="/en/endpoints/spei-transaction">
+    Schema of the polling endpoint
+  </Card>
+</CardGroup>

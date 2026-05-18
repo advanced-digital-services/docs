@@ -1,0 +1,59 @@
+---
+title: 'refund_out event'
+description: 'Sent refund notification — you returned a received cash-in transaction'
+---
+
+## When it fires
+
+The `refund_out` event fires when a **cash-in you received is returned to the payer**. The corresponding balance is debited from your account.
+
+Common scenarios:
+
+- You triggered a refund for fraud or error
+- Customer requested cancellation within the SPEI deadline
+- OXXO dispute in which NTX Pay returns the value
+
+## Payload
+
+```json
+{
+  "event": "refund_out",
+  "deliveryId": "7d2c9e8f-5b34-4c19-aa18-99b3c4d5e6f7",
+  "createdAt": "2026-05-14T11:45:00.000Z",
+  "transaction": {
+    "id": 78901,
+    "externalId": "order-abc-123-refund",
+    "paymentMethod": "SPEI",
+    "direction": "out",
+    "type": "refund_out",
+    "status": "CONFIRMED",
+    "provider": "smartfastpay",
+    "amountCentavos": 50000,
+    "clabe": "012180001234567890",
+    "createdAt": "2026-05-14T11:44:50.000Z",
+    "confirmedAt": "2026-05-14T11:45:00.000Z"
+  },
+  "originalTransactionId": 12345
+}
+```
+
+`originalTransactionId` points to the `id` of the original cash-in that was returned.
+
+## Expected Response
+
+`HTTP 200 OK`.
+
+## Recommended Processing
+
+```typescript
+if (event.event === 'refund_out') {
+  // Balance already debited
+  await markOrderAsRefunded({
+    originalCashInId: event.originalTransactionId,
+    refundId: event.transaction.id,
+    amount: event.transaction.amountCentavos,
+  });
+}
+```
+
+See the [implementation guide](/en/guides/webhooks/implementation) for HMAC validation.

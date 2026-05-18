@@ -1,0 +1,66 @@
+---
+title: 'NTX Pay México API'
+description: 'SPEI and OXXO integration in a single API'
+---
+
+Public gateway for SPEI (instant interbank transfers) and OXXO (cash payments) integration. Receive via SPEI or OXXO, send via SPEI, query balance and transactions, receive signed webhooks.
+
+## Environments
+
+| Environment | URL |
+|---|---|
+| Sandbox | `https://sandbox.ntxpay.com` |
+| Production | `https://api.ntxpay.com` |
+
+## Authentication
+
+1. `POST /api/signup` creates the account and returns `clientId` + `clientSecret`.
+2. `POST /api/auth/token` with X.509 certificate in the `X-SSL-Client-Cert` header + credentials returns a JWT (10 min validity).
+
+The JWT goes in `Authorization: Bearer <token>` for the other endpoints.
+
+## Monetary values
+
+MXN centavos, integers. `50000` = $500.00 MXN.
+
+## Dates
+
+ISO 8601 UTC: `2026-05-12T14:31:05.000Z`.
+
+## HTTP Codes
+
+| Code | Meaning |
+|---|---|
+| `200` / `201` | Success |
+| `400` | Invalid data or insufficient balance |
+| `401` | Invalid token or certificate |
+| `404` | Resource not found |
+| `429` | Rate limit |
+| `502` | Downstream provider unavailable |
+
+## First steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" href="/en/guides/quickstart">
+    Signup, token and first transaction
+  </Card>
+  <Card title="Migrating from Voluti" href="/en/guides/migrating-from-voluti">
+    Payload and endpoint mapping
+  </Card>
+  <Card title="SPEI" href="/en/guides/spei-cash-in">
+    Cash-in and cash-out via CLABE
+  </Card>
+  <Card title="OXXO" href="/en/guides/oxxo-cash-in">
+    Cash-in in cash
+  </Card>
+  <Card title="Webhooks" href="/en/guides/webhooks/overview">
+    HMAC notifications
+  </Card>
+  <Card title="Endpoints" href="/en/endpoints/generate-token">
+    Schemas per endpoint
+  </Card>
+</CardGroup>
+
+## Support
+
+`suporte@ntxpay.com` · `https://app.ntxpay.com`

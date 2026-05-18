@@ -1,0 +1,135 @@
+---
+title: 'Signup'
+description: 'Criação programática de conta NTX Pay México (sandbox ou produção)'
+---
+
+## Visão Geral
+
+O endpoint `POST /api/signup` cria uma nova conta NTX Pay México. **Não requer autenticação** (sem JWT, sem certificado) — é o ponto de entrada da integração.
+
+Na criação, o NTX Pay:
+
+1. Configura a conta no Keycloak (identity provider)
+2. Aplica limites e taxas default
+3. Define o `mainProvider`:
+   - `sandbox` se `isSandbox=true` (transações simuladas)
+   - `smartfastpay` caso contrário (produção)
+4. Emite credenciais OAuth 2.0 (`clientId` + `clientSecret`)
+5. Opcionalmente emite certificado mTLS
+
+## Endpoint
+
+### POST /api/signup
+
+#### Request — Pessoa Física (sandbox)
+
+```bash
+curl -X POST https://sandbox.ntxpay.com/api/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "holderName": "Maria Lopez",
+    "holderTaxIdPrimary": "LOMA850101ABC",
+    "holderTaxIdPrimaryType": "RFC",
+    "accountType": "PF",
+    "email": "maria@example.com",
+    "phone": "+5215512345678",
+    "isSandbox": true
+  }'
+```
+
+#### Request — Pessoa Jurídica (produção)
+
+```bash
+curl -X POST https://sandbox.ntxpay.com/api/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "holderName": "Acme S.A. de C.V.",
+    "holderTaxIdPrimary": "ACM850101AB1",
+    "holderTaxIdPrimaryType": "RFC",
+    "accountType": "PJ",
+    "email": "contato@acme.mx"
+  }'
+```
+
+#### Response (201)
+
+```json
+{
+  "accountId": 93,
+  "publicId": "acc_550e8400-e29b-41d4-a716-446655440000",
+  "mainProvider": "sandbox",
+  "credentials": {
+    "clientId": "qr-93-550e8400",
+    "clientSecret": "a1b2c3d4e5f6g7h8"
+  },
+  "certificate": {
+    "fingerprint": "sha256:abcd1234...",
+    "expiresAt": "2027-05-13T00:00:00.000Z"
+  },
+  "message": "Conta criada com sucesso. Guarde clientSecret em local seguro."
+}
+```
+
+<Warning>
+  O `clientSecret` é exibido **apenas uma vez**, na resposta do signup. Se for perdido, é necessário emitir uma nova credencial pelo painel ou suporte.
+</Warning>
+
+## Campos do Request
+
+<ParamField path="holderName" type="string" required>
+  Nome completo do titular (mínimo 3, máximo 255 caracteres).
+</ParamField>
+
+<ParamField path="holderTaxIdPrimary" type="string" required>
+  RFC (Pessoa Física ou Jurídica) ou CURP (Pessoa Física). 10–20 caracteres.
+</ParamField>
+
+<ParamField path="holderTaxIdPrimaryType" type="enum" required>
+  `RFC` ou `CURP`.
+</ParamField>
+
+<ParamField path="accountType" type="enum" required>
+  `PJ` (empresa) ou `PF` (pessoa física).
+</ParamField>
+
+<ParamField path="email" type="string">
+  Email de contato. Opcional, mas recomendado.
+</ParamField>
+
+<ParamField path="phone" type="string">
+  Telefone em formato E.164 (8–20 caracteres). Ex.: `+5215512345678`.
+</ParamField>
+
+<ParamField path="isSandbox" type="boolean" default="false">
+  `true` → conta em ambiente sandbox (provider `sandbox`, transações simuladas).
+  `false` → conta de produção (provider `smartfastpay`).
+</ParamField>
+
+## Sandbox vs Produção
+
+| Aspecto | Sandbox | Produção |
+|---|---|---|
+| Provider | `sandbox` | `smartfastpay` |
+| Confirmação SPEI | Imediata (simulada) | Real (segundos a minutos via Banxico) |
+| Confirmação OXXO | Imediata | Após leitura no caixa (minutos a horas) |
+| Custo | Gratuito | Tarifas em produção |
+| Limites | Permissivos | Conforme contrato |
+| Endpoint base | `https://sandbox.ntxpay.com` | `https://sandbox.ntxpay.com` |
+
+## Erros Comuns
+
+| Código | Causa |
+|---|---|
+| `400` | RFC/CURP inválido, accountType inválido, ou tax ID já em uso |
+| `502` | `account-ms` (provisionamento) indisponível — tente novamente |
+
+## Próximos Passos
+
+<CardGroup cols={2}>
+  <Card title="Autenticação" href="/api-reference/guides/authentication">
+    Use o clientId/clientSecret recém-emitidos para gerar o JWT
+  </Card>
+  <Card title="Sandbox" href="/api-reference/guides/sandbox-testing">
+    Boas práticas para testes em ambiente sandbox
+  </Card>
+</CardGroup>

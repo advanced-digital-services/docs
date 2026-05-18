@@ -1,0 +1,99 @@
+---
+title: 'Sandbox'
+description: 'Simulate SPEI and OXXO scenarios with no cost or production risk'
+---
+
+## What it is
+
+The **sandbox** is an isolated environment with simulated transactions. Useful for:
+
+- Testing integration before going to production
+- Validating webhook flows in different scenarios
+- Training team without risk of moving real money
+
+## How to access
+
+1. Create an account with `isSandbox: true` in `POST /api/signup`:
+
+```bash
+curl -X POST https://sandbox.ntxpay.com/api/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "holderName": "Test",
+    "holderTaxIdPrimary": "TEST850101ABC",
+    "holderTaxIdPrimaryType": "RFC",
+    "accountType": "PF",
+    "isSandbox": true
+  }'
+```
+
+2. The created account will have `mainProvider: "sandbox"` (instead of `smartfastpay`)
+3. Always use the host `https://sandbox.ntxpay.com` for that account
+
+## Differences vs Production
+
+| Aspect | Sandbox | Production |
+|---|---|---|
+| Provider | `sandbox` | `smartfastpay` |
+| SPEI cash-in confirmation | **Immediate** (~seconds) | Real (seconds to minutes) |
+| OXXO cash-in confirmation | **Immediate** | After register payment (minutes to hours) |
+| SPEI cash-out | Settles immediately | Real Banxico settlement |
+| Webhooks | Same format | Same format |
+| Cost | Free | Per contract |
+
+## Recommended Scenarios
+
+### 1. Happy-path cash-in
+
+1. Create sandbox account
+2. Generate token
+3. Create SPEI cash-in
+4. Confirm receipt of `cash_in` webhook with `status: CONFIRMED`
+
+### 2. Cash-out + balance
+
+1. Receive at least one cash-in (balance > 0)
+2. Cash-out an amount ≤ balance
+3. Confirm `cash_out` webhook with `status: CONFIRMED`
+4. Confirm decremented balance in `/api/balance`
+
+### 3. Cash-out with insufficient balance
+
+1. Attempt cash-out > available balance
+2. Should receive `400` immediately
+
+### 4. Rate-limit on transactions
+
+1. Make 31+ calls to `/api/transactions` in < 1 minute
+2. From the 31st onward, should receive `429`
+
+### 5. Webhook dedupe
+
+1. Force your handler to return `500` on one delivery
+2. NTX Pay will retry — verify your dedupe by the `X-NTXPay-Delivery`
+
+## Force Specific Scenarios
+
+In sandbox, specific `amountCentavos` values can trigger special behaviors (consult the NTX Pay team for active conventions). Typical examples:
+
+| `amountCentavos` | Expected behavior |
+|---|---|
+| `1` | Immediate confirmation |
+| `666` | Force failure (`status: FAILED`) |
+| `13` | Force quick expiration |
+
+<Info>
+  These conventions may vary — confirm with NTX Pay which are currently active.
+</Info>
+
+## Promotion to Production
+
+When comfortable:
+
+1. Create a **new account** at `https://api.ntxpay.com/api/signup` **without** `isSandbox`
+2. Only change:
+   - Host: `sandbox.ntxpay.com` → `api.ntxpay.com`
+   - Credentials (`clientId`/`clientSecret`)
+   - X.509 certificate (production is distinct from sandbox)
+3. Reconfigure webhooks on the production account
+4. Make a low-value transaction before releasing volume

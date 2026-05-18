@@ -1,0 +1,42 @@
+---
+title: 'API NTX Pay México'
+description: 'Integração com SPEI e OXXO em uma única API'
+---
+
+Gateway público para integração com SPEI (transferências interbancárias instantâneas) e OXXO (pagamento em dinheiro). Recebimento via SPEI ou OXXO, envio via SPEI, consulta de saldo e transações, webhooks assinados.
+
+## Ambiente
+
+| Ambiente | URL |
+|---|---|
+| Sandbox | `https://sandbox.ntxpay.com` |
+
+## Autenticação
+
+1. Solicite uma conta sandbox em `support@ntxpay.com` — você recebe `clientId`/`clientSecret` + certificado X.509.
+2. `POST /api/auth/token` com certificado no header `X-SSL-Client-Cert` + credenciais retorna um JWT (10 min de validade).
+
+O JWT vai em `Authorization: Bearer <token>` nos demais endpoints.
+
+## Valores monetários
+
+Centavos MXN, inteiros. `50000` = $500.00 MXN.
+
+## Datas
+
+ISO 8601 UTC: `2026-05-12T14:31:05.000Z`.
+
+## Códigos HTTP
+
+| Código | Significado |
+|---|---|
+| `200` / `201` | Sucesso |
+| `400` | Dados inválidos ou saldo insuficiente |
+| `401` | Token ou certificado inválido |
+| `404` | Recurso não encontrado |
+| `429` | Rate limit |
+| `502` | Provider downstream indisponível |
+
+## Suporte
+
+`support@ntxpay.com`

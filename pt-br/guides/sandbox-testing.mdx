@@ -1,0 +1,243 @@
+---
+title: 'Sandbox Testing'
+description: 'Como usar o ambiente sandbox do NTX Pay México para simular cenários SPEI e OXXO sem custo nem risco.'
+---
+
+## O que é o Sandbox?
+
+O sandbox é o ambiente público da NTX Pay México para integração e testes:
+
+- **Base URL única**: `https://sandbox.ntxpay.com`
+- **Provedor bancário simulado** — não toca Banxico nem a rede SPEI real
+- **Saldo simulado** — sem movimentação financeira real
+- **Webhooks simulados** disparados ~1 segundo após cada request
+- **`X-Sandbox-Scenario`** disponível para forçar diferentes resultados nos webhooks
+
+<Info>
+  Atualmente toda integração com a NTX Pay acontece pelo sandbox. Os endpoints, payloads e webhooks descritos nesta documentação são os definitivos — quando produção for liberada, o mesmo código funcionará apenas trocando as credenciais.
+</Info>
+
+## Começando com Sandbox
+
+<Steps>
+  <Step title="Solicite uma conta sandbox">
+    Contate seu account manager ou escreva para `support@ntxpay.com`.
+  </Step>
+  <Step title="Receba suas credenciais">
+    Certificado X.509 + `clientId`/`clientSecret` exclusivos do sandbox.
+  </Step>
+  <Step title="Registre a URL do webhook">
+    `POST /api/webhooks-config` com a URL HTTPS que vai receber os eventos simulados.
+  </Step>
+  <Step title="Confirme o modo sandbox no painel">
+    No dashboard, vá em **Settings** e verifique se o provider é `sandbox`.
+  </Step>
+  <Step title="Autentique e simule cenários">
+    Autentique via `POST /api/auth/token` e use o header `X-Sandbox-Scenario` para simular resultados.
+  </Step>
+</Steps>
+
+## Visão Geral
+
+- O header `X-Sandbox-Scenario` controla o **resultado do webhook** assíncrono.
+- Sem o header, o sandbox devolve webhooks de **sucesso** por padrão.
+- Para cenários de erro, **envie o header explicitamente** na request.
+- A feature está disponível em **todas** as contas sandbox.
+
+## Como Funciona
+
+O header **não altera a resposta HTTP**. A API sempre responde `201 Created` com `status: "PENDING"`. O cenário afeta exclusivamente o **webhook assíncrono** disparado ~1 segundo depois.
+
+| Request | HTTP Response | Webhook (~1s depois) |
+|---|---|---|
+| Sem `X-Sandbox-Scenario` | `201 PENDING` | `CONFIRMED` |
+| `X-Sandbox-Scenario: success` | `201 PENDING` | `CONFIRMED` |
+| `X-Sandbox-Scenario: error:insufficient-funds` | `201 PENDING` | `FAILED` com `errorCode` |
+| `X-Sandbox-Scenario: delayed:5s` | `201 PENDING` | `CONFIRMED` com +5s de delay |
+
+## Como Usar
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Sandbox-Scenario: error:insufficient-funds" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amountCentavos": 15000,
+    "destinationClabe": "012180001234567890",
+    "beneficiaryName": "Maria Lopez",
+    "externalId": "test-error-001"
+  }'
+```
+
+```javascript JavaScript
+const response = await axios.post(
+  'https://sandbox.ntxpay.com/api/spei/cash-out',
+  {
+    amountCentavos: 15000,
+    destinationClabe: '012180001234567890',
+    beneficiaryName: 'Maria Lopez',
+    externalId: 'test-error-001',
+  },
+  {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'X-Sandbox-Scenario': 'error:insufficient-funds',
+    },
+  }
+);
+```
+
+```python Python
+response = requests.post(
+    "https://sandbox.ntxpay.com/api/spei/cash-out",
+    json={
+        "amountCentavos": 15000,
+        "destinationClabe": "012180001234567890",
+        "beneficiaryName": "Maria Lopez",
+        "externalId": "test-error-001",
+    },
+    headers={
+        "Authorization": f"Bearer {token}",
+        "X-Sandbox-Scenario": "error:insufficient-funds",
+    },
+)
+```
+
+</CodeGroup>
+
+## Cenários Disponíveis
+
+### Cenários de Erro
+
+| Header Value | Descrição | Webhook Status |
+|---|---|---|
+| `error:insufficient-funds` | Conta sem saldo suficiente | `FAILED` |
+| `error:invalid-clabe` | CLABE de destino malformada ou inexistente | `FAILED` |
+| `error:account-not-found` | Conta destino não localizada na rede SPEI | `FAILED` |
+| `error:account-blocked` | Conta destino bloqueada ou encerrada | `FAILED` |
+| `error:duplicate-external-id` | `externalId` já usado em outra transação | `FAILED` |
+| `error:bank-rejected` | Banco destino rejeitou a transferência (genérico) | `FAILED` |
+| `error:oxxo-expired` | Cupom OXXO expirou sem pagamento | `EXPIRED` |
+
+### Cenário de Sucesso
+
+| Header Value | Descrição | Webhook Status |
+|---|---|---|
+| `success` | Força sucesso (mesmo comportamento do default) | `CONFIRMED` |
+| _(sem header)_ | Comportamento default do sandbox | `CONFIRMED` |
+
+### Cenários de Delay
+
+| Header Value | Descrição | Webhook Status |
+|---|---|---|
+| `delayed:5s` | Sucesso após 5 segundos extras | `CONFIRMED` |
+| `delayed:30s` | Sucesso após 30 segundos extras | `CONFIRMED` |
+| `delayed:60s` | Sucesso após 60 segundos extras | `CONFIRMED` |
+
+<Info>
+  O delay máximo permitido é de **120 segundos** — valores acima são truncados automaticamente.
+</Info>
+
+## Exemplos de Webhook Recebido
+
+### Webhook de Sucesso (default)
+
+```json
+{
+  "event": "cash_out",
+  "deliveryId": "8e2c5b6f-3a12-4b9c-9a18-77a2b3c4d5e6",
+  "createdAt": "2026-03-26T10:00:00.000Z",
+  "transaction": {
+    "id": 12345,
+    "externalId": "test-success-001",
+    "paymentMethod": "SPEI",
+    "direction": "out",
+    "type": "cash_out",
+    "status": "CONFIRMED",
+    "provider": "sandbox",
+    "amountCentavos": 15000,
+    "clabe": "012180001234567890",
+    "referenceNumerical": "9876543",
+    "createdAt": "2026-03-26T09:59:59.000Z",
+    "confirmedAt": "2026-03-26T10:00:00.000Z",
+    "counterpart": {
+      "name": "Maria Lopez",
+      "taxId": null,
+      "bank": {}
+    }
+  },
+  "errorCode": null,
+  "errorMessage": null,
+  "metadata": {}
+}
+```
+
+### Webhook de Erro (`error:insufficient-funds`)
+
+```json
+{
+  "event": "cash_out",
+  "deliveryId": "1a3f9e8d-2c47-4b9c-aa18-77a2b3c4d5e6",
+  "createdAt": "2026-03-26T10:01:00.000Z",
+  "transaction": {
+    "id": 12346,
+    "externalId": "test-error-001",
+    "paymentMethod": "SPEI",
+    "direction": "out",
+    "type": "cash_out",
+    "status": "FAILED",
+    "provider": "sandbox",
+    "amountCentavos": 15000,
+    "clabe": "012180001234567890",
+    "referenceNumerical": null,
+    "createdAt": "2026-03-26T10:00:59.000Z",
+    "confirmedAt": null,
+    "counterpart": {
+      "name": null,
+      "taxId": null,
+      "bank": {}
+    }
+  },
+  "errorCode": "INSUFFICIENT_FUNDS",
+  "errorMessage": "Conta sem saldo suficiente",
+  "metadata": {}
+}
+```
+
+Notas:
+
+- Em `status: FAILED`, `referenceNumerical` e `confirmedAt` são `null` (a rede SPEI nunca confirmou a transação).
+- `errorCode` e `errorMessage` descrevem o motivo da falha.
+
+## Endpoints Compatíveis
+
+| Endpoint | Método | Descrição |
+|---|---|---|
+| `/api/spei/cash-in` | POST | Gerar CLABE descartável de cobrança |
+| `/api/spei/cash-out` | POST | Enviar SPEI por CLABE |
+| `/api/oxxo/cash-in` | POST | Gerar cupom OXXO |
+
+## Comportamento
+
+- A API processa a request normalmente: retorna `201 Created` com `status: PENDING`.
+- O header **não altera a resposta imediata**.
+- Após ~1 segundo (ou mais com `delayed:`), o webhook é enviado para a URL configurada.
+- Seu sistema recebe o webhook com `status` correspondente ao cenário (`CONFIRMED` ou `FAILED`).
+
+<Warning>
+  O header controla **apenas o webhook**. A resposta HTTP é sempre `201 Created` com `status: PENDING`, independentemente do cenário.
+</Warning>
+
+## Boas Práticas
+
+1. **Teste todos os cenários** — implemente o tratamento de `CONFIRMED`, `PENDING`, `FAILED` e `EXPIRED` antes de ir ao ar.
+2. **Valide os campos de erro** — use `errorCode` e `errorMessage` para tomar a ação adequada (notificar usuário, retry, etc.).
+3. **Teste com delay** — verifique se seu sistema lida bem com entrega lenta do webhook.
+4. **Idempotência** — use `transaction.id` como chave de idempotência; o mesmo webhook pode ser reenviado.
+
+## Suporte
+
+`support@ntxpay.com`

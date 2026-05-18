@@ -1,0 +1,96 @@
+---
+title: 'cash_in event'
+description: 'Notification sent when a SPEI or OXXO cash-in is confirmed'
+---
+
+## When it fires
+
+The `cash_in` event fires when:
+
+- A SPEI transfer arrives at the **disposable CLABE** issued by `POST /api/spei/cash-in` and is settled
+- An OXXO payment issued by `POST /api/oxxo/cash-in` is paid at the register and confirmed
+
+## Payload
+
+```json
+{
+  "event": "cash_in",
+  "deliveryId": "8e2c5b6f-3a12-4b9c-9a18-77a2b3c4d5e6",
+  "createdAt": "2026-05-12T14:31:05.000Z",
+  "transaction": {
+    "id": 12345,
+    "externalId": "order-abc-123",
+    "paymentMethod": "SPEI",
+    "direction": "in",
+    "type": "cash_in",
+    "status": "CONFIRMED",
+    "provider": "smartfastpay",
+    "amountCentavos": 50000,
+    "clabe": "012180001234567890",
+    "createdAt": "2026-05-12T14:30:00.000Z",
+    "confirmedAt": "2026-05-12T14:31:05.000Z"
+  }
+}
+```
+
+## Headers
+
+| Header | Value |
+|---|---|
+| `X-NTXPay-Event` | `cash_in` |
+| `X-NTXPay-Signature` | `sha256=<hmac>` |
+| `X-NTXPay-Timestamp` | Unix epoch (seconds) |
+| `X-NTXPay-Delivery` | unique delivery UUID |
+
+## SPEI vs OXXO Differences
+
+| Aspect | SPEI | OXXO |
+|---|---|---|
+| `paymentMethod` | `SPEI` | `OXXO` |
+| `clabe` | Source CLABE | `null` |
+| Time to confirmation | Seconds to minutes | Minutes to hours after paying at register |
+| Additional identifier | `referenceNumerical` | `referenceNumerical` |
+
+## Expected Response
+
+Respond `200 OK` in under 10 seconds. On any other status, NTX Pay retries up to 5 times in exponential backoff.
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{"received": true}
+```
+
+## Handler Example (Node.js / Express)
+
+```typescript
+import express from 'express';
+import crypto from 'crypto';
+
+const app = express();
+app.use(express.raw({ type: 'application/json' })); // raw body for HMAC
+
+const SECRET = process.env.NTXPAY_WEBHOOK_SECRET!;
+
+app.post('/webhooks/ntxpay', (req, res) => {
+  const sig = req.header('X-NTXPay-Signature') ?? '';
+  const expected = 'sha256=' + crypto
+    .createHmac('sha256', SECRET)
+    .update(req.body) // req.body is Buffer
+    .digest('hex');
+
+  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+    return res.status(401).end();
+  }
+
+  const event = JSON.parse(req.body.toString());
+  if (event.event === 'cash_in' && event.transaction.status === 'CONFIRMED') {
+    enqueue(event); // process async
+  }
+
+  res.json({ received: true });
+});
+```
+
+See the [implementation guide](/en/guides/webhooks/implementation) for Python and PHP.

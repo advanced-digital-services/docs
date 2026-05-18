@@ -1,0 +1,78 @@
+---
+title: 'Quickstart'
+description: 'Signup, authentication and first SPEI transaction'
+---
+
+## Prerequisites
+
+- `clientId` and `clientSecret` (obtained via `POST /api/signup` or from the panel)
+- X.509 certificate (mTLS) provided by NTX Pay
+- HTTPS URL to receive webhooks
+
+## 1. Create account
+
+```bash
+curl -X POST https://sandbox.ntxpay.com/api/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "holderName": "Maria Lopez",
+    "holderTaxIdPrimary": "LOMA850101ABC",
+    "holderTaxIdPrimaryType": "RFC",
+    "accountType": "PF",
+    "email": "maria@example.com",
+    "isSandbox": true
+  }'
+```
+
+The response includes `credentials.clientId` and `credentials.clientSecret`. The `clientSecret` is shown only once.
+
+## 2. Generate token
+
+```bash
+ENCODED_CERT=$(cat client.cert.pem | python3 -c "import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read()))")
+
+curl -X POST https://sandbox.ntxpay.com/api/auth/token \
+  -H "X-SSL-Client-Cert: $ENCODED_CERT" \
+  -H "Content-Type: application/json" \
+  -d '{"clientId":"qr-93-550e8400","clientSecret":"a1b2..."}'
+```
+
+Returns `access_token` with 10-minute validity.
+
+## 3. Configure webhook
+
+```bash
+curl -X POST https://sandbox.ntxpay.com/api/webhooks-config \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://my-server.com/webhooks/ntxpay",
+    "events": ["cash_in", "cash_out"]
+  }'
+```
+
+The response includes the `secret` used to validate the HMAC signature.
+
+## 4. Create SPEI charge
+
+```bash
+curl -X POST https://sandbox.ntxpay.com/api/spei/cash-in \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amountCentavos": 50000,
+    "externalId": "order-001",
+    "customerName": "Juan Perez"
+  }'
+```
+
+Returns `destinationClabe`. The payer transfers to that CLABE; confirmation arrives via webhook `cash_in`.
+
+## Environments
+
+| Environment | URL | Provider |
+|---|---|---|
+| Sandbox | `https://sandbox.ntxpay.com` | `sandbox` (simulated transactions) |
+| Production | `https://api.ntxpay.com` | `smartfastpay` |
+
+Sandbox account: `isSandbox: true` in signup.

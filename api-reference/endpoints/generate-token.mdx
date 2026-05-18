@@ -1,9 +1,0 @@
----
-openapi: post /api/auth/token
----
-
-Este endpoint gera um token JWT de acesso válido por **30 minutos** (1800 segundos). Requer certificado X.509 vinculado à conta e credenciais OAuth 2.0.
-
-<Note>
-  O certificado X.509 deve ser enviado URL-encoded no header `X-SSL-Client-Cert`. O certificado deve estar previamente vinculado à sua conta.
-</Note>

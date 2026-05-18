@@ -1,15 +1,30 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Documentação da API Avista",
-  "locale": "pt-BR",
+  "name": "NTX Pay API",
   "openapi": "api-reference/openapi.json",
+  "appearance": {
+    "default": "dark"
+  },
   "colors": {
-    "primary": "#4A70B8",
-    "light": "#6B8FD1",
-    "dark": "#355A9C"
+    "primary": "#0a0d12",
+    "light": "#00ff80",
+    "dark": "#0a0d12"
+  },
+  "background": {
+    "color": {
+      "light": "#ffffff",
+      "dark": "#0a0d12"
+    }
+  },
+  "fonts": {
+    "family": "IBM Plex Sans",
+    "weight": 400
   },
   "favicon": "/favicon.svg",
+  "styling": {
+    "codeblocks": "system"
+  },
   "api": {
     "playground": {
       "mode": "show"
@@ -17,112 +32,169 @@
     "prefill": true
   },
   "navigation": {
-    "tabs": [
+    "languages": [
       {
-        "tab": "Guias",
-        "groups": [
+        "language": "es",
+        "tabs": [
           {
-            "group": "Introdução",
-            "pages": [
-              "api-reference/introduction",
-              "api-reference/guides/quickstart"
-            ]
-          },
-          {
-            "group": "Guias de Integração",
-            "pages": [
-              "api-reference/guides/authentication",
-              "api-reference/guides/balance",
-              "api-reference/guides/pix-cash-in",
-              "api-reference/guides/pix-split",
-              "api-reference/guides/pix-cash-out",
-              "api-reference/guides/pix-cash-out-qrcode",
-              "api-reference/guides/pix-refund-in",
-              "api-reference/guides/transactions-search",
-              "api-reference/guides/transactions-by-pix-key",
-              "api-reference/guides/sandbox-testing"
-            ]
-          },
-          {
-            "group": "Webhooks",
-            "pages": [
-              "api-reference/guides/webhooks/overview",
-              "api-reference/guides/webhooks/setup",
-              "api-reference/guides/webhooks/cash-in",
-              "api-reference/guides/webhooks/cash-out",
-              "api-reference/guides/webhooks/cash-in-reversal",
-              "api-reference/guides/webhooks/cash-out-reversal",
-              "api-reference/guides/webhooks/implementation",
-              "api-reference/guides/webhook-resend"
+            "tab": "API Reference",
+            "groups": [
+              {
+                "group": "Guide",
+                "pages": [
+                  "es/guides/get-started",
+                  "es/guides/authentication",
+                  "es/guides/sandbox-testing",
+                  "es/guides/postman-collections"
+                ]
+              },
+              {
+                "group": "Webhooks",
+                "pages": [
+                  "es/guides/webhooks/overview",
+                  "es/guides/webhooks/setup",
+                  "es/guides/webhooks/implementation",
+                  "es/guides/webhooks/cash-in",
+                  "es/guides/webhooks/cash-out",
+                  "es/guides/webhooks/refund-in",
+                  "es/guides/webhooks/refund-out"
+                ]
+              },
+              {
+                "group": "Endpoints",
+                "pages": [
+                  "es/endpoints/signup",
+                  "es/endpoints/generate-token",
+                  "es/endpoints/get-balance",
+                  "es/endpoints/spei-cash-in",
+                  "es/endpoints/spei-cash-out",
+                  "es/endpoints/spei-transaction",
+                  "es/endpoints/oxxo-cash-in",
+                  "es/endpoints/transactions-list",
+                  "es/endpoints/webhooks-config-list",
+                  "es/endpoints/webhooks-config-setup",
+                  "es/endpoints/webhooks-config-delete"
+                ]
+              }
             ]
           }
         ]
       },
       {
-        "tab": "Referência da API",
-        "groups": [
+        "language": "en",
+        "tabs": [
           {
-            "group": "Autenticação",
-            "pages": [
-              "api-reference/endpoints/generate-token"
-            ]
-          },
-          {
-            "group": "Saldo",
-            "pages": [
-              "api-reference/endpoints/get-balance"
-            ]
-          },
-          {
-            "group": "Transações PIX",
-            "pages": [
-              "api-reference/endpoints/pix-cash-in",
-              "api-reference/endpoints/pix-cash-out",
-              "api-reference/endpoints/pix-cash-out-qrcode",
-              "api-reference/endpoints/pix-refund-in",
-              "api-reference/endpoints/pix-transaction-poll",
-              "api-reference/endpoints/transactions-search",
-              "api-reference/endpoints/list-transactions-by-pix-key",
-              "api-reference/endpoints/get-transaction-by-pix-key"
-            ]
-          },
-          {
-            "group": "Webhooks",
-            "pages": [
-              "api-reference/endpoints/webhooks-list",
-              "api-reference/endpoints/webhooks-setup",
-              "api-reference/endpoints/webhook-resend"
+            "tab": "API Reference",
+            "groups": [
+              {
+                "group": "Guide",
+                "pages": [
+                  "en/guides/get-started",
+                  "en/guides/authentication",
+                  "en/guides/postman-collections"
+                ]
+              },
+              {
+                "group": "Webhooks",
+                "pages": [
+                  "en/guides/webhooks/overview",
+                  "en/guides/webhooks/setup",
+                  "en/guides/webhooks/implementation",
+                  "en/guides/webhooks/cash-in",
+                  "en/guides/webhooks/cash-out",
+                  "en/guides/webhooks/refund-in",
+                  "en/guides/webhooks/refund-out"
+                ]
+              },
+              {
+                "group": "Endpoints",
+                "pages": [
+                  "en/endpoints/signup",
+                  "en/endpoints/generate-token",
+                  "en/endpoints/get-balance",
+                  "en/endpoints/spei-cash-in",
+                  "en/endpoints/spei-cash-out",
+                  "en/endpoints/spei-transaction",
+                  "en/endpoints/oxxo-cash-in",
+                  "en/endpoints/transactions-list",
+                  "en/endpoints/webhooks-config-list",
+                  "en/endpoints/webhooks-config-setup",
+                  "en/endpoints/webhooks-config-delete"
+                ]
+              }
             ]
           }
         ]
       },
       {
-        "tab": "PIX Bacen",
-        "groups": [
+        "language": "pt-BR",
+        "default": true,
+        "tabs": [
           {
-            "group": "Introdução",
-            "pages": [
-              "pix-bacen/introduction",
-              "pix-bacen/authentication",
-              "pix-bacen/activation"
-            ]
-          },
-          {
-            "group": "Endpoints",
-            "pages": [
-              "pix-bacen/endpoints/cob",
-              "pix-bacen/endpoints/devolucao",
-              "pix-bacen/endpoints/dict-pix",
-              "pix-bacen/endpoints/balance"
-            ]
-          },
-          {
-            "group": "Webhooks V2",
-            "pages": [
-              "pix-bacen/webhooks/overview",
-              "pix-bacen/webhooks/receive",
-              "pix-bacen/webhooks/transfer",
-              "pix-bacen/webhooks/refund"
+            "tab": "API Reference",
+            "groups": [
+              {
+                "group": "Guia",
+                "pages": [
+                  "pt-br/guides/get-started",
+                  "pt-br/guides/authentication",
+                  "pt-br/guides/sandbox-testing",
+                  "pt-br/guides/postman-collections"
+                ]
+              },
+              {
+                "group": "Eventos de Webhook",
+                "pages": [
+                  "pt-br/guides/webhooks/overview",
+                  "pt-br/guides/webhooks/setup",
+                  "pt-br/guides/webhooks/implementation",
+                  "pt-br/guides/webhooks/cash-in",
+                  "pt-br/guides/webhooks/cash-out",
+                  "pt-br/guides/webhooks/refund-in",
+                  "pt-br/guides/webhooks/refund-out"
+                ]
+              },
+              {
+                "group": "Autenticação",
+                "pages": [
+                  "pt-br/endpoints/generate-token"
+                ]
+              },
+              {
+                "group": "Conta",
+                "pages": [
+                  "pt-br/endpoints/signup",
+                  "pt-br/endpoints/get-balance"
+                ]
+              },
+              {
+                "group": "SPEI",
+                "pages": [
+                  "pt-br/endpoints/spei-cash-in",
+                  "pt-br/endpoints/spei-cash-out",
+                  "pt-br/endpoints/spei-transaction"
+                ]
+              },
+              {
+                "group": "OXXO",
+                "pages": [
+                  "pt-br/endpoints/oxxo-cash-in"
+                ]
+              },
+              {
+                "group": "Transações",
+                "pages": [
+                  "pt-br/endpoints/transactions-list"
+                ]
+              },
+              {
+                "group": "Webhooks Config",
+                "pages": [
+                  "pt-br/endpoints/webhooks-config-list",
+                  "pt-br/endpoints/webhooks-config-setup",
+                  "pt-br/endpoints/webhooks-config-delete"
+                ]
+              }
             ]
           }
         ]
@@ -137,12 +209,7 @@
     "dark": "/logo/dark.svg"
   },
   "navbar": {
-    "links": [],
-    "primary": {
-      "type": "button",
-      "label": "Painel",
-      "href": "https://app.avista.global"
-    }
+    "links": []
   },
   "contextual": {
     "options": [
@@ -160,14 +227,14 @@
     "socials": {}
   },
   "metadata": {
-    "og:site_name": "Documentação da API Avista",
-    "og:title": "Documentação da API Avista - Integração PIX",
-    "og:description": "Documentação completa da API Avista para integração de pagamentos PIX, cobranças, transferências e webhooks.",
+    "og:site_name": "Documentação da API NTX Pay México",
+    "og:title": "Documentação da API NTX Pay México — SPEI e OXXO",
+    "og:description": "Integração com SPEI (cash-in via CLABE, cash-out) e OXXO (cash-in em dinheiro) através de uma única API.",
     "og:type": "website",
     "og:locale": "pt_BR",
     "twitter:card": "summary_large_image",
-    "twitter:title": "Documentação da API Avista",
-    "twitter:description": "Documentação completa da API Avista para integração de pagamentos PIX."
+    "twitter:title": "Documentação da API NTX Pay México",
+    "twitter:description": "Integração SPEI e OXXO via API REST."
   },
   "seo": {
     "indexHiddenPages": false

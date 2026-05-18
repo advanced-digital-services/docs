@@ -1,0 +1,61 @@
+---
+title: 'Postman Collections'
+description: 'Import the official Postman collection to test the NTX Pay API locally.'
+---
+
+## Download
+
+We maintain a ready-to-use Postman collection with all public endpoints of the NTX Pay México API.
+
+<CardGroup cols={2}>
+  <Card title="Download (.json)" href="https://app.ntxpay.com/postman/ntxpay-mexico.postman_collection.json">
+    Postman Collection v2.1
+  </Card>
+  <Card title="Environments" href="https://app.ntxpay.com/postman/ntxpay-environments.zip">
+    Sandbox and Production
+  </Card>
+</CardGroup>
+
+## Import into Postman
+
+1. Open Postman
+2. **File → Import**
+3. Select the downloaded `.json` file
+4. Also import the environments zip and pick **Sandbox** to start testing
+
+## Configure Environment Variables
+
+The environment expects 3 variables:
+
+| Variable | Description | Example |
+|---|---|---|
+| `clientId` | OAuth client_id of your account | `qr-93-550e8400` |
+| `clientSecret` | OAuth client_secret | `a1b2c3d4...` |
+| `certificatePem` | X.509 certificate in a single line (no line breaks, with literal `\n`) | `-----BEGIN CERTIFICATE-----\n...` |
+
+## Suggested Flow
+
+The collection is organized in typical usage order:
+
+1. **Auth → Generate Token** — run this first. The response auto-saves `access_token` to an environment variable.
+2. **Balance → Get Balance** — confirm the token works.
+3. **SPEI → Cash-In** — create a simulated charge.
+4. **Transactions → List** — check status.
+
+## Available Folders
+
+- `Auth` — JWT generation
+- `Signup` — account creation
+- `Balance` — balance query
+- `SPEI` — cash-in, cash-out, transaction by external ID
+- `OXXO` — cash-in
+- `Transactions` — list
+- `Webhooks Config` — list, create, delete
+
+## Alternatives
+
+Prefer a different tool?
+
+- **Insomnia**: import the same `.json` (Postman v2.1 compatible)
+- **OpenAPI / Bruno**: use our [`openapi.json`](/api-reference/openapi.json) directly
+- **cURL**: every endpoint page in this documentation has a ready-to-copy cURL example

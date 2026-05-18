@@ -1,0 +1,61 @@
+---
+title: 'Get Started'
+description: 'Welcome to the NTX Pay México API. This guide walks you through the first steps to integrate and start using SPEI and OXXO.'
+---
+
+## Overview
+
+The NTX Pay México API lets your company perform payment operations, check balances, reconcile transactions and receive webhook notifications — all securely and at scale. Authentication is via **X.509 certificate (mTLS) + OAuth 2.0**, returning a short-lived **JWT** for each request.
+
+## Getting Started with Sandbox
+
+<Steps>
+  <Step title="Request a sandbox account">
+    Contact your account manager or write to `contact@ntxpay.com` to request a sandbox account.
+  </Step>
+  <Step title="Receive your credentials">
+    You will receive a **certificate** and **OAuth credentials** (`clientId` + `clientSecret`) for the sandbox account.
+  </Step>
+  <Step title="Register your webhook URL">
+    Register your webhook URL via `POST /api/webhooks-config` so you can receive simulated webhook events.
+
+    ```bash
+    curl -X POST https://sandbox.ntxpay.com/api/webhooks-config \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "url": "https://my-server.com/webhooks/ntxpay",
+        "events": ["cash_in", "cash_out"]
+      }'
+    ```
+  </Step>
+  <Step title="Confirm sandbox mode in the dashboard">
+    In the dashboard, go to **Settings** to confirm your account is configured in sandbox mode.
+  </Step>
+  <Step title="Authenticate and simulate scenarios">
+    Authenticate, make API calls, and use the `X-Sandbox-Scenario` header to simulate different outcomes (immediate confirmation, failure, expiration, etc.).
+
+    ```bash
+    curl -X POST https://sandbox.ntxpay.com/api/spei/cash-in \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "X-Sandbox-Scenario: cash_in_failed" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "amountCentavos": 50000,
+        "externalId": "order-001",
+        "customerName": "Juan Perez"
+      }'
+    ```
+  </Step>
+</Steps>
+
+## Environments
+
+| Environment | URL | Provider |
+|---|---|---|
+| Sandbox | `https://sandbox.ntxpay.com` | `sandbox` (simulated transactions) |
+| Production | `https://api.ntxpay.com` | `smartfastpay` |
+
+## Support
+
+`contact@ntxpay.com` · `https://app.ntxpay.com`
