@@ -1,0 +1,56 @@
+name: Docs CI
+
+# Gate de qualidade da doc ANTES do Mintlify SaaS publicar.
+# O deploy em si é feito pelo Mintlify (push na branch de deploy configurada
+# no dashboard = main). Este workflow NÃO faz deploy — valida e barra branding.
+#
+# Triggers:
+# - pull_request -> main : gate real (combinar com required status check / branch protection)
+# - push        -> main : sinal pré/pós-deploy (Mintlify deploya independente do resultado)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate docs (links + JSON)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Mintlify CLI
+        run: npm i -g mint
+
+      - name: Validate JSON (docs.json + openapi.json)
+        run: |
+          jq empty docs.json
+          jq empty api-reference/openapi.json
+          echo "✅ JSON válido"
+
+      - name: Check broken internal links
+        run: mint broken-links
+
+  branding:
+    name: Branding leak check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run branding check
+        run: bash scripts/check-branding.sh "${{ github.base_ref || github.ref_name }}"
