@@ -1,0 +1,141 @@
+---
+title: 'Test scenarios'
+description: 'Force specific behaviors via the X-Sandbox-Scenario header.'
+mode: 'wide'
+---
+
+## How to use
+
+Add the header `X-Sandbox-Scenario: <scenario>` to any cash-in, cash-out, or OXXO call. Without the header, the sandbox uses the `success` scenario by default.
+
+```bash
+curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Sandbox-Scenario: error:insufficient-funds" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amountCentavos": 15000,
+    "destinationClabe": "012180001234567890",
+    "beneficiaryName": "Maria Lopez",
+    "externalId": "test-error-001"
+  }'
+```
+
+<Warning>
+  The header only controls the **asynchronous webhook**. The HTTP response is always `201 Created` with `status: PENDING`, regardless of the scenario. The final outcome (`CONFIRMED`, `FAILED`, or `EXPIRED`) arrives in the webhook ~1 second later.
+</Warning>
+
+## Available scenarios
+
+### Success scenarios
+
+| Header Value | Synchronous behavior | Webhook |
+|---|---|---|
+| `success` (default) | `201 PENDING` | `CONFIRMED` in ~1s |
+| _(no header)_ | `201 PENDING` | `CONFIRMED` in ~1s |
+
+### Error scenarios
+
+| Header Value | Synchronous behavior | Webhook |
+|---|---|---|
+| `error:insufficient-funds` | `201 PENDING` | `FAILED` with `errorCode: INSUFFICIENT_FUNDS` |
+| `error:invalid-clabe` | `201 PENDING` | `FAILED` with `errorCode: INVALID_CLABE` |
+| `error:account-not-found` | `201 PENDING` | `FAILED` with `errorCode: ACCOUNT_NOT_FOUND` |
+| `error:account-blocked` | `201 PENDING` | `FAILED` with `errorCode: ACCOUNT_BLOCKED` |
+| `error:duplicate-external-id` | `201 PENDING` | `FAILED` with `errorCode: DUPLICATE_EXTERNAL_ID` |
+| `error:bank-rejected` | `201 PENDING` | `FAILED` with `errorCode: BANK_REJECTED` |
+| `error:oxxo-expired` | `201 PENDING` | `EXPIRED` (OXXO only) |
+
+### Delay scenarios
+
+| Header Value | Synchronous behavior | Webhook |
+|---|---|---|
+| `delayed:5s` | `201 PENDING` | `CONFIRMED` after +5s |
+| `delayed:30s` | `201 PENDING` | `CONFIRMED` after +30s |
+| `delayed:60s` | `201 PENDING` | `CONFIRMED` after +60s |
+
+<Info>
+  The maximum allowed delay is **120 seconds** — higher values are truncated automatically.
+</Info>
+
+## Example: success webhook
+
+```json
+{
+  "event": "cash_out",
+  "deliveryId": "8e2c5b6f-3a12-4b9c-9a18-77a2b3c4d5e6",
+  "createdAt": "2026-03-26T10:00:00.000Z",
+  "transaction": {
+    "id": 12345,
+    "externalId": "test-success-001",
+    "paymentMethod": "SPEI",
+    "direction": "out",
+    "type": "cash_out",
+    "status": "CONFIRMED",
+    "provider": "sandbox",
+    "amountCentavos": 15000,
+    "clabe": "012180001234567890",
+    "referenceNumerical": "9876543",
+    "createdAt": "2026-03-26T09:59:59.000Z",
+    "confirmedAt": "2026-03-26T10:00:00.000Z",
+    "counterpart": {
+      "name": "Maria Lopez",
+      "taxId": null,
+      "bank": {}
+    }
+  },
+  "errorCode": null,
+  "errorMessage": null,
+  "metadata": {}
+}
+```
+
+## Example: failure webhook
+
+```json
+{
+  "event": "cash_out",
+  "deliveryId": "1a3f9e8d-2c47-4b9c-aa18-77a2b3c4d5e6",
+  "createdAt": "2026-03-26T10:01:00.000Z",
+  "transaction": {
+    "id": 12346,
+    "externalId": "test-error-001",
+    "paymentMethod": "SPEI",
+    "direction": "out",
+    "type": "cash_out",
+    "status": "FAILED",
+    "provider": "sandbox",
+    "amountCentavos": 15000,
+    "clabe": "012180001234567890",
+    "referenceNumerical": null,
+    "confirmedAt": null
+  },
+  "errorCode": "INSUFFICIENT_FUNDS",
+  "errorMessage": "Account without sufficient balance",
+  "metadata": {}
+}
+```
+
+Notes:
+
+- On `status: FAILED`, `referenceNumerical` and `confirmedAt` are `null` — the SPEI network never confirmed the transaction.
+- `errorCode` and `errorMessage` describe the reason for the failure.
+
+## Restrictions
+
+- The `X-Sandbox-Scenario` header works **exclusively** on sandbox accounts.
+- Production accounts sending the header receive:
+
+```json
+{
+  "statusCode": 400,
+  "message": "X-Sandbox-Scenario header is only supported in sandbox mode."
+}
+```
+
+## Best practices
+
+1. **Test every scenario** before going live — implement handling for `CONFIRMED`, `PENDING`, `FAILED`, and `EXPIRED`.
+2. **Validate the error fields** — use `errorCode` for automated decisions; keep `errorMessage` for logs/users.
+3. **Test with delay** — make sure your system handles slow webhook delivery well.
+4. **Idempotency** — use `transaction.id` as the idempotency key; the same webhook can be re-delivered.

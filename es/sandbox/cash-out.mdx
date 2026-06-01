@@ -1,0 +1,102 @@
+---
+title: 'Cash-out (envío SPEI)'
+description: 'Cómo enviar SPEI a una CLABE de destino en sandbox.'
+mode: 'wide'
+---
+
+## Qué hace
+
+`POST /api/spei/cash-out` solicita el envío de SPEI a una CLABE de destino. En sandbox, el pipeline contable completo se ejercita — el saldo se debita, la tarifa se cobra, se genera registro en el extracto — pero la llamada a Banxico es simulada.
+
+La respuesta HTTP siempre es `201 Created` con `status: PENDING`. El resultado final llega vía webhook `cash_out` ~1 segundo después (escenario `success`) o según el escenario forzado.
+
+## Prerrequisito
+
+Tu cuenta sandbox necesita saldo. Realiza al menos un [cash-in](/es/sandbox/cash-in) antes — el saldo simulado se debita igual que en producción.
+
+## Ejemplo
+
+```bash
+curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amountCentavos": 15000,
+    "destinationClabe": "012180001234567890",
+    "beneficiaryName": "Maria Lopez",
+    "beneficiaryTaxId": "LOPM850101ABC",
+    "externalId": "payout-001",
+    "description": "Pago a proveedor"
+  }'
+```
+
+### Response (201)
+
+```json
+{
+  "id": 12346,
+  "externalId": "payout-001",
+  "status": "PENDING",
+  "amountCentavos": 15000,
+  "clabe": "012180001234567890"
+}
+```
+
+## Webhook esperado
+
+Tras ~1 segundo (escenario `success`):
+
+```json
+{
+  "event": "cash_out",
+  "deliveryId": "...",
+  "transaction": {
+    "id": 12346,
+    "externalId": "payout-001",
+    "status": "CONFIRMED",
+    "amountCentavos": 15000,
+    "clabe": "012180001234567890",
+    "referenceNumerical": "9876543",
+    "confirmedAt": "2026-03-26T10:00:01.000Z"
+  },
+  "errorCode": null,
+  "errorMessage": null
+}
+```
+
+## Escenarios de error útiles
+
+Fuerza comportamientos específicos vía el header `X-Sandbox-Scenario`:
+
+```bash
+curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Sandbox-Scenario: error:insufficient-funds" \
+  -H "Content-Type: application/json" \
+  -d '{ ... }'
+```
+
+| Escenario | Cuándo usar |
+|---|---|
+| `error:insufficient-funds` | Validar UX cuando tu cliente intenta pagar sin saldo |
+| `error:invalid-clabe` | Validar parsing/validación de CLABE en tu frontend |
+| `error:account-not-found` | Validar error post-red (CLABE existe en tu base, pero no en la red SPEI) |
+| `error:bank-rejected` | Validar fallback genérico |
+| `delayed:30s` | Validar UX de "transferencia en progreso" |
+
+Mira [Escenarios](/es/sandbox/scenarios) para la lista completa.
+
+## Validaciones síncronas
+
+Incluso en sandbox, algunas validaciones ocurren **antes** del retorno `201`:
+
+| Error síncrono | HTTP | Cuándo |
+|---|---|---|
+| `400 INVALID_AMOUNT` | `400` | `amountCentavos <= 0` |
+| `400 INVALID_CLABE_FORMAT` | `400` | CLABE con formato inválido (no-numérica, longitud incorrecta) |
+| `400 DUPLICATE_EXTERNAL_ID` | `400` | `externalId` ya usado en otra transacción de esa cuenta |
+| `400 INSUFFICIENT_FUNDS` | `400` | Saldo real por debajo de `amountCentavos + tarifa` (sin usar escenario) |
+
+<Info>
+  Los escenarios con prefijo `error:` afectan al **webhook** — la respuesta síncrona siempre es `201 PENDING`. Las validaciones estructurales como formato/duplicidad fallan de forma síncrona.
+</Info>
