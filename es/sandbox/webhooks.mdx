@@ -1,0 +1,111 @@
+---
+title: 'Webhooks'
+description: 'Cómo el sandbox entrega webhooks y cómo probar dedupe, retries y firma.'
+mode: 'wide'
+---
+
+## Cómo funciona
+
+El sandbox usa el **mismo motor de outbox** que producción. Eso significa:
+
+- Misma estructura de payload
+- Mismos headers (`X-NTXPay-Delivery`, `X-NTXPay-Signature`, etc.)
+- Misma política de retry exponencial
+- Mismo formato de firma HMAC
+
+La única diferencia es la **velocidad**: los webhooks de sandbox son disparados ~1 segundo después de la request (vs. minutos en producción), y puedes forzar atrasos artificiales vía el escenario `delayed:`.
+
+## Registrar URL
+
+```bash
+curl -X POST https://sandbox.ntxpay.com/api/webhooks-config \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://mi-servidor.com/webhooks/ntxpay",
+    "events": ["cash_in", "cash_out"]
+  }'
+```
+
+### Response (201)
+
+```json
+{
+  "id": "wh_550e8400",
+  "url": "https://mi-servidor.com/webhooks/ntxpay",
+  "events": ["cash_in", "cash_out"],
+  "secret": "whsec_a1b2c3d4...",
+  "createdAt": "2026-03-26T09:00:00.000Z"
+}
+```
+
+Guarda el `secret` devuelto — se usa para verificar la firma HMAC. **Solo se muestra una vez.**
+
+## Eventos disponibles
+
+| Evento | Disparado cuando |
+|---|---|
+| `cash_in` | CLABE desechable recibe una transferencia (simulada) |
+| `cash_out` | Envío SPEI se resuelve (confirmado o falló) |
+| `refund_in` | Refund de cash-in se procesa |
+| `refund_out` | Refund de cash-out se procesa |
+
+## Verificar la firma
+
+Cada webhook llega con el header `X-NTXPay-Signature` en el formato `sha256=<hex>`:
+
+```python
+import hmac
+import hashlib
+
+def verify(payload_bytes: bytes, signature_header: str, secret: str) -> bool:
+    expected = "sha256=" + hmac.new(
+        secret.encode(),
+        payload_bytes,
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature_header)
+```
+
+## Probar dedupe
+
+Cada entrega tiene un `deliveryId` único en el header `X-NTXPay-Delivery` y dentro del payload. Para probar tu dedupe:
+
+1. Configura tu handler para retornar `500` en el primer intento.
+2. NTX Pay entregará el mismo mensaje nuevamente (con el **mismo** `deliveryId`).
+3. Confirma que tu sistema ignora la duplicada y responde `200` en el segundo intento.
+
+## Política de retry
+
+| Intento | Atraso tras el anterior |
+|---|---|
+| 1 | inmediato |
+| 2 | 30s |
+| 3 | 2min |
+| 4 | 10min |
+| 5 | 1h |
+| 6 | 6h |
+| 7+ | abandonado |
+
+Tu endpoint necesita responder `2xx` en hasta **5 segundos** — cualquier `5xx`, timeout o error de conexión dispara retry.
+
+## Escenarios de prueba
+
+Fuerza que el webhook salga como `FAILED` o con delay:
+
+```bash
+curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Sandbox-Scenario: delayed:30s" \
+  -H "Content-Type: application/json" \
+  -d '{ ... }'
+```
+
+Mira [Escenarios](/es/sandbox/scenarios) para el catálogo completo.
+
+## Buenas prácticas
+
+1. **Responde 200 antes de procesar** — encola el evento en background; cinco segundos es el tope.
+2. **Usa `deliveryId` para dedupe** — no confíes en `transaction.id` (los retries llegan con el mismo `transaction.id` pero `deliveryId` nuevo en caso de redrive manual).
+3. **No dependas del orden** — los webhooks pueden llegar fuera de orden tras retries.
+4. **Valida siempre la firma** — incluso en sandbox.
