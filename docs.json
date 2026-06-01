@@ -49,6 +49,17 @@
                 ]
               },
               {
+                "group": "Sandbox",
+                "pages": [
+                  "es/sandbox/introduction",
+                  "es/sandbox/authentication",
+                  "es/sandbox/scenarios",
+                  "es/sandbox/cash-in",
+                  "es/sandbox/cash-out",
+                  "es/sandbox/webhooks"
+                ]
+              },
+              {
                 "group": "Webhooks",
                 "pages": [
                   "es/guides/webhooks/overview",
@@ -90,6 +101,17 @@
                   "en/guides/get-started",
                   "en/guides/authentication",
                   "en/guides/postman-collections"
+                ]
+              },
+              {
+                "group": "Sandbox",
+                "pages": [
+                  "en/sandbox/introduction",
+                  "en/sandbox/authentication",
+                  "en/sandbox/scenarios",
+                  "en/sandbox/cash-in",
+                  "en/sandbox/cash-out",
+                  "en/sandbox/webhooks"
                 ]
               },
               {
@@ -136,6 +158,17 @@
                   "pt-br/guides/authentication",
                   "pt-br/guides/sandbox-testing",
                   "pt-br/guides/postman-collections"
+                ]
+              },
+              {
+                "group": "Sandbox",
+                "pages": [
+                  "pt-br/sandbox/introduction",
+                  "pt-br/sandbox/authentication",
+                  "pt-br/sandbox/scenarios",
+                  "pt-br/sandbox/cash-in",
+                  "pt-br/sandbox/cash-out",
+                  "pt-br/sandbox/webhooks"
                 ]
               },
               {
