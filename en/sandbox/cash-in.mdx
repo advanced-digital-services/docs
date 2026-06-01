@@ -1,0 +1,88 @@
+---
+title: 'Cash-in (SPEI receive)'
+description: 'How to generate a disposable cash-in CLABE in sandbox.'
+mode: 'wide'
+---
+
+## What it does
+
+`POST /api/spei/cash-in` generates a **disposable CLABE** bound to your sandbox account. Any SPEI transfer received at that CLABE triggers a `cash_in` webhook to the configured URL.
+
+In sandbox, confirmation is **simulated** ~1 second after CLABE creation (instead of waiting for a real transfer). This lets you test the entire cash-in flow without depending on a real issuing bank.
+
+## Example
+
+```bash
+curl -X POST https://sandbox.ntxpay.com/api/spei/cash-in \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amountCentavos": 50000,
+    "externalId": "order-001",
+    "customerName": "Juan Pérez"
+  }'
+```
+
+### Response (201)
+
+```json
+{
+  "id": 12345,
+  "externalId": "order-001",
+  "status": "PENDING",
+  "amountCentavos": 50000,
+  "clabe": "646180123456789012",
+  "expiresAt": "2026-03-26T10:30:00.000Z"
+}
+```
+
+Use the returned `clabe` to display to the end payer (your company's customer). In sandbox this CLABE is fictitious, but the `transaction.clabe` field arriving in the webhook will be **the same**.
+
+## Expected webhook
+
+After ~1 second (default `success` scenario):
+
+```json
+{
+  "event": "cash_in",
+  "deliveryId": "...",
+  "transaction": {
+    "id": 12345,
+    "externalId": "order-001",
+    "status": "CONFIRMED",
+    "amountCentavos": 50000,
+    "clabe": "646180123456789012",
+    "confirmedAt": "2026-03-26T10:00:01.000Z",
+    "counterpart": {
+      "name": "Simulated Payer",
+      "taxId": "PAGS850101ABC",
+      "bank": {
+        "code": "012",
+        "name": "BBVA México"
+      }
+    }
+  }
+}
+```
+
+## Test scenarios
+
+| Scenario | Webhook |
+|---|---|
+| Default | `CONFIRMED` |
+| `error:invalid-clabe` | `FAILED` |
+| `error:duplicate-external-id` | `FAILED` |
+| `delayed:5s` | `CONFIRMED` after 5s |
+
+See [Scenarios](/en/sandbox/scenarios) for the full list.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Cash-out" href="/en/sandbox/cash-out">
+    How to send SPEI in sandbox.
+  </Card>
+  <Card title="Webhooks" href="/en/sandbox/webhooks">
+    Understanding webhook delivery in sandbox.
+  </Card>
+</CardGroup>

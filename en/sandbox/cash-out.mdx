@@ -1,0 +1,102 @@
+---
+title: 'Cash-out (SPEI send)'
+description: 'How to send SPEI to a destination CLABE in sandbox.'
+mode: 'wide'
+---
+
+## What it does
+
+`POST /api/spei/cash-out` requests a SPEI transfer to a destination CLABE. In sandbox, the full accounting pipeline runs — balance is debited, fee is charged, statement entry is generated — but the Banxico call is simulated.
+
+The HTTP response is always `201 Created` with `status: PENDING`. The final outcome arrives via `cash_out` webhook ~1 second later (`success` scenario) or as forced by the scenario.
+
+## Prerequisite
+
+Your sandbox account needs balance. Run at least one [cash-in](/en/sandbox/cash-in) first — simulated balance is debited just like in production.
+
+## Example
+
+```bash
+curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amountCentavos": 15000,
+    "destinationClabe": "012180001234567890",
+    "beneficiaryName": "Maria Lopez",
+    "beneficiaryTaxId": "LOPM850101ABC",
+    "externalId": "payout-001",
+    "description": "Supplier payment"
+  }'
+```
+
+### Response (201)
+
+```json
+{
+  "id": 12346,
+  "externalId": "payout-001",
+  "status": "PENDING",
+  "amountCentavos": 15000,
+  "clabe": "012180001234567890"
+}
+```
+
+## Expected webhook
+
+After ~1 second (`success` scenario):
+
+```json
+{
+  "event": "cash_out",
+  "deliveryId": "...",
+  "transaction": {
+    "id": 12346,
+    "externalId": "payout-001",
+    "status": "CONFIRMED",
+    "amountCentavos": 15000,
+    "clabe": "012180001234567890",
+    "referenceNumerical": "9876543",
+    "confirmedAt": "2026-03-26T10:00:01.000Z"
+  },
+  "errorCode": null,
+  "errorMessage": null
+}
+```
+
+## Useful error scenarios
+
+Force specific behaviors via the `X-Sandbox-Scenario` header:
+
+```bash
+curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Sandbox-Scenario: error:insufficient-funds" \
+  -H "Content-Type: application/json" \
+  -d '{ ... }'
+```
+
+| Scenario | When to use |
+|---|---|
+| `error:insufficient-funds` | Validate UX when your customer tries to pay without balance |
+| `error:invalid-clabe` | Validate CLABE parsing/validation in your frontend |
+| `error:account-not-found` | Validate post-network error (CLABE exists locally but not on the SPEI network) |
+| `error:bank-rejected` | Validate generic fallback |
+| `delayed:30s` | Validate "transfer in progress" UX |
+
+See [Scenarios](/en/sandbox/scenarios) for the full list.
+
+## Synchronous validations
+
+Even in sandbox, some validations happen **before** the `201` is returned:
+
+| Synchronous error | HTTP | When |
+|---|---|---|
+| `400 INVALID_AMOUNT` | `400` | `amountCentavos <= 0` |
+| `400 INVALID_CLABE_FORMAT` | `400` | CLABE with invalid format (non-numeric, wrong length) |
+| `400 DUPLICATE_EXTERNAL_ID` | `400` | `externalId` already used in another transaction for this account |
+| `400 INSUFFICIENT_FUNDS` | `400` | Real balance below `amountCentavos + fee` (without using a scenario) |
+
+<Info>
+  Scenarios prefixed with `error:` affect the **webhook** — the synchronous response is always `201 PENDING`. Structural validations like format/duplication fail synchronously.
+</Info>
