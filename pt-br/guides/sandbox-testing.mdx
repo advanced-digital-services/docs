@@ -8,7 +8,7 @@ mode: 'wide'
 
 O sandbox é o ambiente público da NTX Pay México para integração e testes:
 
-- **Base URL única**: `https://sandbox.ntxpay.com`
+- **Base URL única**: `https://sandbox.mx.ntxpay.com`
 - **Provedor bancário simulado** — não toca Banxico nem a rede SPEI real
 - **Saldo simulado** — sem movimentação financeira real
 - **Webhooks simulados** disparados ~1 segundo após cada request
@@ -41,7 +41,7 @@ O header **não altera a resposta HTTP**. A API sempre responde `201 Created` co
 <CodeGroup>
 
 ```bash cURL
-curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
+curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Sandbox-Scenario: error:insufficient-funds" \
   -H "Content-Type: application/json" \
@@ -55,7 +55,7 @@ curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
 
 ```javascript JavaScript
 const response = await axios.post(
-  'https://sandbox.ntxpay.com/api/spei/cash-out',
+  'https://sandbox.mx.ntxpay.com/api/spei/cash-out',
   {
     amountCentavos: 15000,
     destinationClabe: '012180001234567890',
@@ -73,7 +73,7 @@ const response = await axios.post(
 
 ```python Python
 response = requests.post(
-    "https://sandbox.ntxpay.com/api/spei/cash-out",
+    "https://sandbox.mx.ntxpay.com/api/spei/cash-out",
     json={
         "amountCentavos": 15000,
         "destinationClabe": "012180001234567890",

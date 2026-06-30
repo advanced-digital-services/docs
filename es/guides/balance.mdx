@@ -23,7 +23,7 @@ Authorization: Bearer {token}
 #### Request
 
 ```bash
-curl -X GET https://sandbox.ntxpay.com/api/balance \
+curl -X GET https://sandbox.mx.ntxpay.com/api/balance \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -59,7 +59,7 @@ curl -X GET https://sandbox.ntxpay.com/api/balance \
 import axios from 'axios';
 
 async function getBalance(token: string) {
-  const { data } = await axios.get('https://sandbox.ntxpay.com/api/balance', {
+  const { data } = await axios.get('https://sandbox.mx.ntxpay.com/api/balance', {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -85,7 +85,7 @@ async function safeSpeiCashOut(amountCentavos: number, token: string, dto: any) 
     );
   }
 
-  return axios.post('https://sandbox.ntxpay.com/api/spei/cash-out', dto, {
+  return axios.post('https://sandbox.mx.ntxpay.com/api/spei/cash-out', dto, {
     headers: { Authorization: `Bearer ${token}` },
   });
 }

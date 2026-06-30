@@ -8,7 +8,7 @@
   },
   "servers": [
     {
-      "url": "https://sandbox.ntxpay.com",
+      "url": "https://sandbox.mx.ntxpay.com",
       "description": "Sandbox"
     }
   ],

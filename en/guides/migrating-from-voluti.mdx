@@ -18,7 +18,7 @@ The NTX Pay México API was designed so that customers coming from **Voluti SPEI
 | Item | Voluti | NTX Pay |
 |---|---|---|
 | Production host | `api.spei.magenpay.io` | Provided at onboarding |
-| Sandbox host | — | `sandbox.ntxpay.com` |
+| Sandbox host | — | `sandbox.mx.ntxpay.com` |
 | Versioning | `/api/v1` | `/api` |
 | Auth header | `Authorization: API_KEY:NONCE:SIGNATURE` | `Authorization: Bearer <JWT>` |
 | Credential issuance | API key + secret from panel | `POST /api/signup` → `clientId/clientSecret`; then `POST /api/auth/token` with cert X.509 |
@@ -51,7 +51,7 @@ curl -X POST https://api.spei.magenpay.io/api/v1/transaction/cashin \
   }'
 
 # NTX Pay — IDENTICAL payload works
-curl -X POST https://sandbox.ntxpay.com/api/spei/cash-in \
+curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
   -H "Authorization: Bearer $JWT" \
   -d '{
     "amount": "100.00",
@@ -104,7 +104,7 @@ curl -X POST https://api.spei.magenpay.io/api/v1/transaction/cashout \
   }'
 
 # NTX Pay — same payload accepted
-curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
+curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
   -H "Authorization: Bearer $JWT" \
   -d '{
     "amount": "100.00",
@@ -124,7 +124,7 @@ The dedicated endpoint keeps 1-to-1 semantics with Voluti's `conciliation`:
 curl -X GET https://api.spei.magenpay.io/api/v1/transaction/order_abc_123/conciliation
 
 # NTX Pay
-curl -X GET https://sandbox.ntxpay.com/api/spei/transaction/order_abc_123 \
+curl -X GET https://sandbox.mx.ntxpay.com/api/spei/transaction/order_abc_123 \
   -H "Authorization: Bearer $JWT"
 ```
 

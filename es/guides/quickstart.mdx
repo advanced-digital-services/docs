@@ -12,7 +12,7 @@ description: 'Signup, autenticación y primera transacción SPEI'
 ## 1. Crear cuenta
 
 ```bash
-curl -X POST https://sandbox.ntxpay.com/api/signup \
+curl -X POST https://sandbox.mx.ntxpay.com/api/signup \
   -H "Content-Type: application/json" \
   -d '{
     "holderName": "Maria Lopez",
@@ -31,7 +31,7 @@ La respuesta trae `credentials.clientId` y `credentials.clientSecret`. El `clien
 ```bash
 ENCODED_CERT=$(cat client.cert.pem | python3 -c "import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read()))")
 
-curl -X POST https://sandbox.ntxpay.com/api/auth/token \
+curl -X POST https://sandbox.mx.ntxpay.com/api/auth/token \
   -H "X-SSL-Client-Cert: $ENCODED_CERT" \
   -H "Content-Type: application/json" \
   -d '{"clientId":"qr-93-550e8400","clientSecret":"a1b2..."}'
@@ -42,7 +42,7 @@ Retorna `access_token` con validez de 10 minutos.
 ## 3. Configurar webhook
 
 ```bash
-curl -X POST https://sandbox.ntxpay.com/api/webhooks-config \
+curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -56,7 +56,7 @@ La respuesta trae el `secret` usado para validar la firma HMAC.
 ## 4. Crear cobro SPEI
 
 ```bash
-curl -X POST https://sandbox.ntxpay.com/api/spei/cash-in \
+curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -72,7 +72,7 @@ Retorna `destinationClabe`. El pagador transfiere a esa CLABE; la confirmación 
 
 | Ambiente | URL | Provider |
 |---|---|---|
-| Sandbox | `https://sandbox.ntxpay.com` | `sandbox` (transacciones simuladas) |
+| Sandbox | `https://sandbox.mx.ntxpay.com` | `sandbox` (transacciones simuladas) |
 | Producción | Provista en el onboarding | `smartfastpay` |
 
 Cuenta sandbox: `isSandbox: true` en el signup.

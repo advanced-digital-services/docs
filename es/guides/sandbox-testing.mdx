@@ -16,7 +16,7 @@ El sandbox es un **modo de operación** de tu cuenta — no un ambiente separado
 
 | Aspecto | Sandbox | Producción |
 |---|---|---|
-| Base URL | `https://sandbox.ntxpay.com` | Provista en el onboarding |
+| Base URL | `https://sandbox.mx.ntxpay.com` | Provista en el onboarding |
 | Cuenta | Dedicada de sandbox | Dedicada de producción |
 | Credenciales | Certificado + `clientId`/`clientSecret` propios | Certificado + credenciales propios |
 | Saldo | Simulado | Fondos reales |
@@ -68,7 +68,7 @@ El header **no altera la respuesta HTTP**. La API siempre responde `201 Created`
 <CodeGroup>
 
 ```bash cURL
-curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
+curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Sandbox-Scenario: error:insufficient-funds" \
   -H "Content-Type: application/json" \
@@ -82,7 +82,7 @@ curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
 
 ```javascript JavaScript
 const response = await axios.post(
-  'https://sandbox.ntxpay.com/api/spei/cash-out',
+  'https://sandbox.mx.ntxpay.com/api/spei/cash-out',
   {
     amountCentavos: 15000,
     destinationClabe: '012180001234567890',
@@ -100,7 +100,7 @@ const response = await axios.post(
 
 ```python Python
 response = requests.post(
-    "https://sandbox.ntxpay.com/api/spei/cash-out",
+    "https://sandbox.mx.ntxpay.com/api/spei/cash-out",
     json={
         "amountCentavos": 15000,
         "destinationClabe": "012180001234567890",

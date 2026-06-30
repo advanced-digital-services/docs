@@ -18,7 +18,7 @@ A única diferença é a **velocidade**: webhooks de sandbox são disparados ~1 
 ## Registrar URL
 
 ```bash
-curl -X POST https://sandbox.ntxpay.com/api/webhooks-config \
+curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -94,7 +94,7 @@ Seu endpoint precisa responder `2xx` em até **5 segundos** — qualquer `5xx`, 
 Force o webhook sair como `FAILED` ou com delay:
 
 ```bash
-curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
+curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Sandbox-Scenario: delayed:30s" \
   -H "Content-Type: application/json" \

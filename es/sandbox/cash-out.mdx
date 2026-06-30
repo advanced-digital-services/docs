@@ -17,7 +17,7 @@ Tu cuenta sandbox necesita saldo. Realiza al menos un [cash-in](/es/sandbox/cash
 ## Ejemplo
 
 ```bash
-curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
+curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -69,7 +69,7 @@ Tras ~1 segundo (escenario `success`):
 Fuerza comportamientos específicos vía el header `X-Sandbox-Scenario`:
 
 ```bash
-curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
+curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Sandbox-Scenario: error:insufficient-funds" \
   -H "Content-Type: application/json" \
