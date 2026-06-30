@@ -17,7 +17,7 @@ A configuração de webhooks é feita via três endpoints:
 ### Request
 
 ```bash
-curl -X POST https://sandbox.ntxpay.com/api/webhooks-config \
+curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -60,7 +60,7 @@ curl -X POST https://sandbox.ntxpay.com/api/webhooks-config \
 ## Listar Webhooks
 
 ```bash
-curl -X GET https://sandbox.ntxpay.com/api/webhooks-config \
+curl -X GET https://sandbox.mx.ntxpay.com/api/webhooks-config \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -87,7 +87,7 @@ curl -X GET https://sandbox.ntxpay.com/api/webhooks-config \
 ## Remover Webhook
 
 ```bash
-curl -X DELETE https://sandbox.ntxpay.com/api/webhooks-config/42 \
+curl -X DELETE https://sandbox.mx.ntxpay.com/api/webhooks-config/42 \
   -H "Authorization: Bearer $TOKEN"
 ```
 

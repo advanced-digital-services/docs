@@ -20,7 +20,7 @@ The NTX Pay México API lets your company perform payment operations, check bala
     Register your webhook URL via `POST /api/webhooks-config` so you can receive simulated webhook events.
 
     ```bash
-    curl -X POST https://sandbox.ntxpay.com/api/webhooks-config \
+    curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
       -H "Authorization: Bearer $TOKEN" \
       -H "Content-Type: application/json" \
       -d '{
@@ -36,7 +36,7 @@ The NTX Pay México API lets your company perform payment operations, check bala
     Authenticate, make API calls, and use the `X-Sandbox-Scenario` header to simulate different outcomes (immediate confirmation, failure, expiration, etc.).
 
     ```bash
-    curl -X POST https://sandbox.ntxpay.com/api/spei/cash-in \
+    curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
       -H "Authorization: Bearer $TOKEN" \
       -H "X-Sandbox-Scenario: cash_in_failed" \
       -H "Content-Type: application/json" \
@@ -53,7 +53,7 @@ The NTX Pay México API lets your company perform payment operations, check bala
 
 | Environment | URL | Provider |
 |---|---|---|
-| Sandbox | `https://sandbox.ntxpay.com` | `sandbox` (simulated transactions) |
+| Sandbox | `https://sandbox.mx.ntxpay.com` | `sandbox` (simulated transactions) |
 | Production | Provided at onboarding | `smartfastpay` |
 
 ## Support

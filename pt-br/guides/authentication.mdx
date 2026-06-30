@@ -39,7 +39,7 @@ ENCODED_CERT=$(cat client.cert.pem | python3 -c "import sys,urllib.parse; print(
 #### Request
 
 ```bash
-curl -X POST https://sandbox.ntxpay.com/api/auth/token \
+curl -X POST https://sandbox.mx.ntxpay.com/api/auth/token \
   -H "X-SSL-Client-Cert: $ENCODED_CERT" \
   -H "Content-Type: application/json" \
   -d '{
@@ -64,7 +64,7 @@ curl -X POST https://sandbox.ntxpay.com/api/auth/token \
 Inclua o `access_token` em todas as requisições autenticadas:
 
 ```bash
-curl -X GET https://sandbox.ntxpay.com/api/spei/transaction/order-abc-123 \
+curl -X GET https://sandbox.mx.ntxpay.com/api/spei/transaction/order-abc-123 \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -98,7 +98,7 @@ const encodedCert = encodeURIComponent(cert);
 
 async function getToken(): Promise<string> {
   const { data } = await axios.post(
-    'https://sandbox.ntxpay.com/api/auth/token',
+    'https://sandbox.mx.ntxpay.com/api/auth/token',
     {
       clientId: process.env.NTXPAY_CLIENT_ID,
       clientSecret: process.env.NTXPAY_CLIENT_SECRET,
@@ -125,7 +125,7 @@ encoded_cert = urllib.parse.quote(cert)
 
 def get_token() -> str:
     resp = requests.post(
-        "https://sandbox.ntxpay.com/api/auth/token",
+        "https://sandbox.mx.ntxpay.com/api/auth/token",
         json={
             "clientId": os.environ["NTXPAY_CLIENT_ID"],
             "clientSecret": os.environ["NTXPAY_CLIENT_SECRET"],
@@ -166,7 +166,7 @@ public class NtxPayAuth {
             );
 
         HttpRequest req = HttpRequest.newBuilder()
-            .uri(URI.create("https://sandbox.ntxpay.com/api/auth/token"))
+            .uri(URI.create("https://sandbox.mx.ntxpay.com/api/auth/token"))
             .header("X-SSL-Client-Cert", encodedCert)
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -211,7 +211,7 @@ func getToken() (string, error) {
 
     req, err := http.NewRequest(
         "POST",
-        "https://sandbox.ntxpay.com/api/auth/token",
+        "https://sandbox.mx.ntxpay.com/api/auth/token",
         bytes.NewReader(payload),
     )
     if err != nil {

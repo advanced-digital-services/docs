@@ -21,7 +21,7 @@ A API NTX Pay México permite que sua empresa realize operações de pagamento, 
     Registre a URL do seu webhook via `POST /api/webhooks-config` para receber eventos simulados.
 
     ```bash
-    curl -X POST https://sandbox.ntxpay.com/api/webhooks-config \
+    curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
       -H "Authorization: Bearer $TOKEN" \
       -H "Content-Type: application/json" \
       -d '{
@@ -34,7 +34,7 @@ A API NTX Pay México permite que sua empresa realize operações de pagamento, 
     Autentique, faça chamadas à API e use o header `X-Sandbox-Scenario` para simular diferentes resultados (confirmação imediata, falha, expiração, etc.).
 
     ```bash
-    curl -X POST https://sandbox.ntxpay.com/api/spei/cash-in \
+    curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
       -H "Authorization: Bearer $TOKEN" \
       -H "X-Sandbox-Scenario: error:insufficient-funds" \
       -H "Content-Type: application/json" \
@@ -51,7 +51,7 @@ A API NTX Pay México permite que sua empresa realize operações de pagamento, 
 
 | Ambiente | URL | Provider |
 |---|---|---|
-| Sandbox | `https://sandbox.ntxpay.com` | `sandbox` (transações simuladas) |
+| Sandbox | `https://sandbox.mx.ntxpay.com` | `sandbox` (transações simuladas) |
 
 ## Suporte
 

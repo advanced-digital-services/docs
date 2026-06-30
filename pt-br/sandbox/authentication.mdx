@@ -14,7 +14,7 @@ A autenticação em sandbox usa as mesmas duas camadas que produção:
 Em conjunto, retornam um **JWT** (validade 10 minutos) usado nos demais endpoints como `Authorization: Bearer ...`.
 
 <Info>
-  As credenciais de sandbox são **distintas** das de produção. Se você usar credenciais de produção contra `https://sandbox.ntxpay.com`, receberá `401`. O contrato HTTP é idêntico — o que muda é o par certificado + clientId/clientSecret.
+  As credenciais de sandbox são **distintas** das de produção. Se você usar credenciais de produção contra `https://sandbox.mx.ntxpay.com`, receberá `401`. O contrato HTTP é idêntico — o que muda é o par certificado + clientId/clientSecret.
 </Info>
 
 ## Obter Token
@@ -22,7 +22,7 @@ Em conjunto, retornam um **JWT** (validade 10 minutos) usado nos demais endpoint
 ### POST /api/auth/token
 
 ```bash
-curl -X POST https://sandbox.ntxpay.com/api/auth/token \
+curl -X POST https://sandbox.mx.ntxpay.com/api/auth/token \
   -H "X-SSL-Client-Cert: $ENCODED_CERT" \
   -H "Content-Type: application/json" \
   -d '{
@@ -47,7 +47,7 @@ curl -X POST https://sandbox.ntxpay.com/api/auth/token \
 Em uma conta sandbox, qualquer chamada autenticada simula um pipeline completo sem mover dinheiro real:
 
 ```bash
-curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
+curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -78,4 +78,4 @@ O token expira em **10 minutos (600s)**. Não há refresh token — gere um novo
 
 ## Documentação detalhada
 
-Para o passo a passo completo (encoding do certificado, exemplos em múltiplas linguagens, etc.) veja [Autenticação](/pt-br/guides/authentication) no guia geral — a única diferença é a base URL `https://sandbox.ntxpay.com`.
+Para o passo a passo completo (encoding do certificado, exemplos em múltiplas linguagens, etc.) veja [Autenticação](/pt-br/guides/authentication) no guia geral — a única diferença é a base URL `https://sandbox.mx.ntxpay.com`.

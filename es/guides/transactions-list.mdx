@@ -34,7 +34,7 @@ Authorization: Bearer {token}
 #### Request
 
 ```bash
-curl -X GET "https://sandbox.ntxpay.com/api/transactions?status=CONFIRMED&paymentMethod=SPEI&limit=50" \
+curl -X GET "https://sandbox.mx.ntxpay.com/api/transactions?status=CONFIRMED&paymentMethod=SPEI&limit=50" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -75,7 +75,7 @@ let offset = 0;
 const limit = 50;
 
 while (true) {
-  const { data } = await axios.get('https://sandbox.ntxpay.com/api/transactions', {
+  const { data } = await axios.get('https://sandbox.mx.ntxpay.com/api/transactions', {
     headers: { Authorization: `Bearer ${token}` },
     params: { limit, offset, status: 'CONFIRMED' },
   });

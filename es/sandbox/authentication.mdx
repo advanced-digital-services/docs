@@ -14,7 +14,7 @@ La autenticación de sandbox usa las mismas dos capas que producción:
 En conjunto, devuelven un **JWT** (validez de 10 minutos) usado en los demás endpoints como `Authorization: Bearer ...`.
 
 <Info>
-  Las credenciales de sandbox son **distintas** de las de producción. Si usas credenciales de producción contra `https://sandbox.ntxpay.com`, recibirás `401`. El contrato HTTP es idéntico — lo que cambia es el par certificado + clientId/clientSecret.
+  Las credenciales de sandbox son **distintas** de las de producción. Si usas credenciales de producción contra `https://sandbox.mx.ntxpay.com`, recibirás `401`. El contrato HTTP es idéntico — lo que cambia es el par certificado + clientId/clientSecret.
 </Info>
 
 ## Obtener Token
@@ -22,7 +22,7 @@ En conjunto, devuelven un **JWT** (validez de 10 minutos) usado en los demás en
 ### POST /api/auth/token
 
 ```bash
-curl -X POST https://sandbox.ntxpay.com/api/auth/token \
+curl -X POST https://sandbox.mx.ntxpay.com/api/auth/token \
   -H "X-SSL-Client-Cert: $ENCODED_CERT" \
   -H "Content-Type: application/json" \
   -d '{
@@ -47,7 +47,7 @@ curl -X POST https://sandbox.ntxpay.com/api/auth/token \
 En una cuenta sandbox, cualquier llamada autenticada simula el pipeline completo sin mover dinero real:
 
 ```bash
-curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
+curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -78,4 +78,4 @@ El token expira en **10 minutos (600s)**. No hay refresh token — genera uno nu
 
 ## Documentación detallada
 
-Para el paso a paso completo (codificación del certificado, ejemplos en múltiples lenguajes, etc.) mira [Autenticación](/es/guides/authentication) en la guía general — la única diferencia es la base URL `https://sandbox.ntxpay.com`.
+Para el paso a paso completo (codificación del certificado, ejemplos en múltiples lenguajes, etc.) mira [Autenticación](/es/guides/authentication) en la guía general — la única diferencia es la base URL `https://sandbox.mx.ntxpay.com`.

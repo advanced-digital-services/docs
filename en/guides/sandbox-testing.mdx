@@ -16,7 +16,7 @@ The **sandbox** is an isolated environment with simulated transactions. Useful f
 1. Create an account with `isSandbox: true` in `POST /api/signup`:
 
 ```bash
-curl -X POST https://sandbox.ntxpay.com/api/signup \
+curl -X POST https://sandbox.mx.ntxpay.com/api/signup \
   -H "Content-Type: application/json" \
   -d '{
     "holderName": "Test",
@@ -28,7 +28,7 @@ curl -X POST https://sandbox.ntxpay.com/api/signup \
 ```
 
 2. The created account will have `mainProvider: "sandbox"` (instead of `smartfastpay`)
-3. Always use the host `https://sandbox.ntxpay.com` for that account
+3. Always use the host `https://sandbox.mx.ntxpay.com` for that account
 
 ## Differences vs Production
 
@@ -91,7 +91,7 @@ When comfortable:
 
 1. Create a **new account** via `POST /api/signup` on your production host (provided at onboarding) **without** `isSandbox`
 2. Only change:
-   - Host: `sandbox.ntxpay.com` → production host (provided at onboarding)
+   - Host: `sandbox.mx.ntxpay.com` → production host (provided at onboarding)
    - Credentials (`clientId`/`clientSecret`)
    - X.509 certificate (production is distinct from sandbox)
 3. Reconfigure webhooks on the production account

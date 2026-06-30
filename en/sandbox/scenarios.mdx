@@ -9,7 +9,7 @@ mode: 'wide'
 Add the header `X-Sandbox-Scenario: <scenario>` to any cash-in or cash-out call. Without the header, the sandbox uses the `success` scenario by default.
 
 ```bash
-curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
+curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Sandbox-Scenario: error:insufficient-funds" \
   -H "Content-Type: application/json" \

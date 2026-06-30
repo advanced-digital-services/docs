@@ -24,7 +24,7 @@ Al crearla, NTX Pay:
 #### Request — Persona Física (sandbox)
 
 ```bash
-curl -X POST https://sandbox.ntxpay.com/api/signup \
+curl -X POST https://sandbox.mx.ntxpay.com/api/signup \
   -H "Content-Type: application/json" \
   -d '{
     "holderName": "Maria Lopez",
@@ -40,7 +40,7 @@ curl -X POST https://sandbox.ntxpay.com/api/signup \
 #### Request — Persona Moral (producción)
 
 ```bash
-curl -X POST https://sandbox.ntxpay.com/api/signup \
+curl -X POST https://sandbox.mx.ntxpay.com/api/signup \
   -H "Content-Type: application/json" \
   -d '{
     "holderName": "Acme S.A. de C.V.",
@@ -113,7 +113,7 @@ curl -X POST https://sandbox.ntxpay.com/api/signup \
 | Confirmación SPEI | Inmediata (simulada) | Real (segundos a minutos vía Banxico) |
 | Costo | Gratuito | Tarifas en producción |
 | Límites | Permisivos | Según contrato |
-| Endpoint base | `https://sandbox.ntxpay.com` | Provista en el onboarding |
+| Endpoint base | `https://sandbox.mx.ntxpay.com` | Provista en el onboarding |
 
 ## Errores Comunes
 
