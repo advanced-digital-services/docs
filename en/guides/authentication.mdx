@@ -8,7 +8,7 @@ description: 'X.509 certificate (mTLS) + OAuth 2.0 client_credentials to get an 
 The NTX Pay México API uses two-layer authentication:
 
 1. **X.509 certificate (mTLS)** — delivered by NTX Pay at onboarding, proves the client server's identity.
-2. **OAuth 2.0 client_credentials** — `clientId` + `clientSecret` received at signup, validated together with the certificate.
+2. **OAuth 2.0 client_credentials** — `clientId` + `clientSecret` received during onboarding, validated together with the certificate.
 
 The combination returns a **JWT** (10-minute validity) used in the other endpoints as `Authorization: Bearer ...`.
 
@@ -115,7 +115,7 @@ async function getToken(): Promise<string> {
 
 <CardGroup cols={2}>
   <Card title="Get Started" href="/en/guides/get-started">
-    Full flow (signup → token → transaction)
+    Full flow (token → transaction)
   </Card>
   <Card title="Balance Query" href="/en/guides/balance">
     Use the token to query the balance

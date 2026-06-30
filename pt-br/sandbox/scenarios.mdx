@@ -36,7 +36,7 @@ Retornam `201 PENDING` de forma síncrona; o estado final chega via webhook.
 |---|---|---|
 | `success` (default) | `CONFIRMED` em ~1s | Também usado quando nenhum header é enviado |
 | `pending_long` | `CONFIRMED` após ~30s | Testa settlement lento |
-| `rejected` | `FAILED` | Provedor / rede SPEI rejeitou a transferência |
+| `rejected` | `FAILED` | A rede SPEI rejeitou a transferência |
 | `returned` | `RETURNED` | Aceita e depois devolvida pelo banco contraparte |
 | `insufficient_funds` | `FAILED` com `errorCode: INSUFFICIENT_FUNDS` | **Apenas cash-out** |
 | `bad_clabe` | `RETURNED` com `errorCode: INVALID_CLABE` | **Apenas cash-out** — aceita e depois devolvida |
@@ -48,7 +48,7 @@ Falham na própria resposta HTTP — nenhum webhook é enviado.
 | Header Value | Resposta síncrona |
 |---|---|
 | `timeout` | Timeout upstream (`504`) após ~16s |
-| `provider_5xx` | `503` provedor indisponível |
+| `provider_5xx` | Serviço temporariamente indisponível (`503`) |
 
 <Info>
   **Restrições de cash-in:** `insufficient_funds` e `bad_clabe` não se aplicam a cash-in (não há saldo a debitar, e a CLABE de depósito é gerada pelo sistema). Enviar qualquer um deles em um cash-in retorna `400` com código `SCENARIO_NOT_APPLICABLE`.
@@ -68,7 +68,6 @@ Falham na própria resposta HTTP — nenhum webhook é enviado.
     "direction": "out",
     "type": "cash_out",
     "status": "CONFIRMED",
-    "provider": "sandbox",
     "amountCentavos": 15000,
     "clabe": "012180001234567890",
     "referenceNumerical": "9876543",
@@ -100,7 +99,6 @@ Falham na própria resposta HTTP — nenhum webhook é enviado.
     "direction": "out",
     "type": "cash_out",
     "status": "FAILED",
-    "provider": "sandbox",
     "amountCentavos": 15000,
     "clabe": "012180001234567890",
     "referenceNumerical": null,

@@ -9,7 +9,7 @@ mode: 'wide'
 A API NTX Pay México usa autenticação em duas camadas:
 
 1. **Certificado** — entregue pelo NTX Pay no onboarding, comprova a identidade do servidor cliente.
-2. **OAuth 2.0 client_credentials** — `clientId` + `clientSecret` recebidos no signup, validados em conjunto com o certificado.
+2. **OAuth 2.0 client_credentials** — `clientId` + `clientSecret` fornecidos no onboarding, validados em conjunto com o certificado.
 
 A combinação retorna um **JWT** (validade 10 minutos) usado nos demais endpoints como `Authorization: Bearer ...`.
 
@@ -240,7 +240,7 @@ func getToken() (string, error) {
 ## Próximos Passos
 
 <CardGroup cols={2}>
-  <Card title="Testes em Sandbox" href="/pt-br/guides/sandbox-testing">
+  <Card title="Cenários de Sandbox" href="/pt-br/sandbox/scenarios">
     Use o header `X-Sandbox-Scenario` para simular sucesso, falha e atraso nos webhooks
   </Card>
   <Card title="Criar Cobrança SPEI" href="/pt-br/endpoints/spei-cash-in">

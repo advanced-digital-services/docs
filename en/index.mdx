@@ -14,7 +14,7 @@ Public gateway for SPEI (instant interbank transfers) integration. Receive and s
 
 ## Authentication
 
-1. `POST /api/signup` creates the account and returns `clientId` + `clientSecret`.
+1. Your credentials (`clientId` + `clientSecret`) are provided during onboarding.
 2. `POST /api/auth/token` with X.509 certificate in the `X-SSL-Client-Cert` header + credentials returns a JWT (10 min validity).
 
 The JWT goes in `Authorization: Bearer <token>` for the other endpoints.
@@ -36,13 +36,13 @@ ISO 8601 UTC: `2026-05-12T14:31:05.000Z`.
 | `401` | Invalid token or certificate |
 | `404` | Resource not found |
 | `429` | Rate limit |
-| `502` | Downstream provider unavailable |
+| `502` | Service temporarily unavailable |
 
 ## First steps
 
 <CardGroup cols={2}>
   <Card title="Get Started" href="/en/guides/get-started">
-    Signup, token and first transaction
+    Token and first transaction
   </Card>
   <Card title="SPEI" href="/en/guides/spei-cash-in">
     Cash-in and cash-out via CLABE

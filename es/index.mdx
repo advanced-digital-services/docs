@@ -14,7 +14,7 @@ Gateway público para integración con SPEI (transferencias interbancarias insta
 
 ## Autenticación
 
-1. `POST /api/signup` crea la cuenta y retorna `clientId` + `clientSecret`.
+1. Tus credenciales (`clientId` + `clientSecret`) se entregan en el onboarding.
 2. `POST /api/auth/token` con certificado X.509 en el header `X-SSL-Client-Cert` + credenciales retorna un JWT (10 min de validez).
 
 El JWT va en `Authorization: Bearer <token>` en los demás endpoints.
@@ -36,13 +36,13 @@ ISO 8601 UTC: `2026-05-12T14:31:05.000Z`.
 | `401` | Token o certificado inválido |
 | `404` | Recurso no encontrado |
 | `429` | Rate limit |
-| `502` | Provider downstream no disponible |
+| `502` | Servicio temporalmente no disponible |
 
 ## Primeros pasos
 
 <CardGroup cols={2}>
   <Card title="Primeros pasos" href="/es/guides/get-started">
-    Signup, token y primera transacción
+    Token y primera transacción
   </Card>
   <Card title="SPEI" href="/es/guides/spei-cash-in">
     Cash-in y cash-out vía CLABE

@@ -8,7 +8,7 @@ description: 'Notification sent when a SPEI cash-out is settled or fails'
 The `cash_out` event fires in two scenarios:
 
 - **Success** — the SPEI cash-out sent via `POST /api/spei/cash-out` was settled at Banxico (`status: CONFIRMED`)
-- **Failure** — the SPEI network or the provider rejected the transfer (`status: FAILED`)
+- **Failure** — the SPEI network rejected the transfer (`status: FAILED`)
 
 ## Payload (confirmed)
 
@@ -24,7 +24,6 @@ The `cash_out` event fires in two scenarios:
     "direction": "out",
     "type": "cash_out",
     "status": "CONFIRMED",
-    "provider": "smartfastpay",
     "amountCentavos": 50000,
     "clabe": "012180001234567890",
     "createdAt": "2026-05-13T12:00:00.000Z",

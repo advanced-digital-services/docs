@@ -6,7 +6,7 @@ mode: 'wide'
 
 ## What it is
 
-The NTX Pay sandbox lets your integration exercise **cash-in**, **cash-out**, **refund**, and **webhooks** without moving real money. Unlike simplistic mocks, the full accounting pipeline (TigerBeetle balance, limit validation, fee charging, statement generation, webhook delivery via outbox) is exercised intact. Only the external provider (SPEI/Banxico) is simulated.
+The NTX Pay sandbox lets your integration exercise **cash-in**, **cash-out**, **refund**, and **webhooks** without moving real money. Unlike simplistic mocks, the full accounting pipeline (TigerBeetle balance, limit validation, fee charging, statement generation, webhook delivery via outbox) is exercised intact. Only settlement on the SPEI network is simulated.
 
 <Info>
   Every NTX Pay integration starts in sandbox. The endpoints, payloads, and webhooks described in this documentation are the final ones — when production is enabled for your company, the same code works by just swapping credentials.
@@ -14,7 +14,7 @@ The NTX Pay sandbox lets your integration exercise **cash-in**, **cash-out**, **
 
 ## How to enable
 
-Your API credentials are **structurally the same** as those you would use in production. The difference lives at the account level: accounts with `mainProvider: "sandbox"` route every SPEI call internally to the NTX simulator. To create a sandbox account, contact your Account Manager or write to `contact@ntxpay.com` — onboarding is instant and KYC is auto-approved.
+Your API credentials are **structurally the same** as those you would use in production. The difference lives at the account level: sandbox accounts route SPEI calls to NTX Pay's internal simulator. To create a sandbox account, contact your Account Manager or write to `contact@ntxpay.com` — onboarding is instant and KYC is auto-approved.
 
 ## Base URL
 
@@ -37,7 +37,6 @@ Register your `webhookUrl` on the sandbox account exactly as you would in produc
 | Aspect | Sandbox | Production |
 |---|---|---|
 | Base URL | `https://sandbox.mx.ntxpay.com` | Provided at onboarding |
-| Provider | `sandbox` (simulated) | Real bank (Banxico/SPEI) |
 | Balance | Simulated | Real funds |
 | SPEI cash-in confirmation | Immediate (~1s) | Real (seconds to minutes) |
 | `X-Sandbox-Scenario` | Supported | Rejected with `400` |

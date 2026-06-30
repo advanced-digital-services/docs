@@ -8,7 +8,7 @@ description: 'Notificación enviada cuando un SPEI cash-out es liquidado o falla
 El evento `cash_out` se dispara en dos escenarios:
 
 - **Éxito** — el SPEI cash-out enviado vía `POST /api/spei/cash-out` fue liquidado en Banxico (`status: CONFIRMED`)
-- **Falla** — la red SPEI o el provider rechazó la transferencia (`status: FAILED`)
+- **Falla** — la red SPEI rechazó la transferencia (`status: FAILED`)
 
 ## Payload (confirmado)
 
@@ -24,7 +24,6 @@ El evento `cash_out` se dispara en dos escenarios:
     "direction": "out",
     "type": "cash_out",
     "status": "CONFIRMED",
-    "provider": "smartfastpay",
     "amountCentavos": 50000,
     "clabe": "012180001234567890",
     "createdAt": "2026-05-13T12:00:00.000Z",
