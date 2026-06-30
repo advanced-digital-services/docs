@@ -1,6 +1,6 @@
 ---
 title: 'Testes em Sandbox'
-description: 'Como usar o ambiente sandbox do NTX Pay México para simular cenários SPEI e OXXO sem custo nem risco.'
+description: 'Como usar o ambiente sandbox do NTX Pay México para simular cenários SPEI sem custo nem risco.'
 mode: 'wide'
 ---
 
@@ -101,7 +101,6 @@ response = requests.post(
 | `error:account-blocked` | Conta destino bloqueada ou encerrada | `FAILED` |
 | `error:duplicate-external-id` | `externalId` já usado em outra transação | `FAILED` |
 | `error:bank-rejected` | Banco destino rejeitou a transferência (genérico) | `FAILED` |
-| `error:oxxo-expired` | Cupom OXXO expirou sem pagamento | `EXPIRED` |
 
 ### Cenário de Sucesso
 
@@ -199,7 +198,6 @@ Notas:
 |---|---|---|
 | `/api/spei/cash-in` | POST | Gerar CLABE descartável de cobrança |
 | `/api/spei/cash-out` | POST | Enviar SPEI por CLABE |
-| `/api/oxxo/cash-in` | POST | Gerar cupom OXXO |
 
 ## Comportamento
 

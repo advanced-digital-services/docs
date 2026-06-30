@@ -1,6 +1,6 @@
 ---
 title: 'cash_in event'
-description: 'Notification sent when a SPEI or OXXO cash-in is confirmed'
+description: 'Notification sent when a SPEI cash-in is confirmed'
 ---
 
 ## When it fires
@@ -8,7 +8,6 @@ description: 'Notification sent when a SPEI or OXXO cash-in is confirmed'
 The `cash_in` event fires when:
 
 - A SPEI transfer arrives at the **disposable CLABE** issued by `POST /api/spei/cash-in` and is settled
-- An OXXO payment issued by `POST /api/oxxo/cash-in` is paid at the register and confirmed
 
 ## Payload
 
@@ -41,15 +40,6 @@ The `cash_in` event fires when:
 | `X-NTXPay-Signature` | `sha256=<hmac>` |
 | `X-NTXPay-Timestamp` | Unix epoch (seconds) |
 | `X-NTXPay-Delivery` | unique delivery UUID |
-
-## SPEI vs OXXO Differences
-
-| Aspect | SPEI | OXXO |
-|---|---|---|
-| `paymentMethod` | `SPEI` | `OXXO` |
-| `clabe` | Source CLABE | `null` |
-| Time to confirmation | Seconds to minutes | Minutes to hours after paying at register |
-| Additional identifier | `referenceNumerical` | `referenceNumerical` |
 
 ## Expected Response
 

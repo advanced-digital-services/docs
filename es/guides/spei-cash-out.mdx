@@ -21,7 +21,7 @@ Content-Type: application/json
 #### Request
 
 ```bash
-curl -X POST https://api.ntxpay.com/api/spei/cash-out \
+curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -105,7 +105,7 @@ if (balance.availableCentavos < amountCentavos) {
 async function speiCashOut(token: string, dto: any) {
   try {
     const { data } = await axios.post(
-      'https://api.ntxpay.com/api/spei/cash-out',
+      'https://sandbox.ntxpay.com/api/spei/cash-out',
       dto,
       { headers: { Authorization: `Bearer ${token}` } },
     );

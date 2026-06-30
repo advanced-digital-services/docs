@@ -17,7 +17,7 @@ The NTX Pay México API was designed so that customers coming from **Voluti SPEI
 
 | Item | Voluti | NTX Pay |
 |---|---|---|
-| Production host | `api.spei.magenpay.io` | `api.ntxpay.com` |
+| Production host | `api.spei.magenpay.io` | Provided at onboarding |
 | Sandbox host | — | `sandbox.ntxpay.com` |
 | Versioning | `/api/v1` | `/api` |
 | Auth header | `Authorization: API_KEY:NONCE:SIGNATURE` | `Authorization: Bearer <JWT>` |
@@ -51,7 +51,7 @@ curl -X POST https://api.spei.magenpay.io/api/v1/transaction/cashin \
   }'
 
 # NTX Pay — IDENTICAL payload works
-curl -X POST https://api.ntxpay.com/api/spei/cash-in \
+curl -X POST https://sandbox.ntxpay.com/api/spei/cash-in \
   -H "Authorization: Bearer $JWT" \
   -d '{
     "amount": "100.00",
@@ -104,7 +104,7 @@ curl -X POST https://api.spei.magenpay.io/api/v1/transaction/cashout \
   }'
 
 # NTX Pay — same payload accepted
-curl -X POST https://api.ntxpay.com/api/spei/cash-out \
+curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
   -H "Authorization: Bearer $JWT" \
   -d '{
     "amount": "100.00",
@@ -124,7 +124,7 @@ The dedicated endpoint keeps 1-to-1 semantics with Voluti's `conciliation`:
 curl -X GET https://api.spei.magenpay.io/api/v1/transaction/order_abc_123/conciliation
 
 # NTX Pay
-curl -X GET https://api.ntxpay.com/api/spei/transaction/order_abc_123 \
+curl -X GET https://sandbox.ntxpay.com/api/spei/transaction/order_abc_123 \
   -H "Authorization: Bearer $JWT"
 ```
 
@@ -196,7 +196,7 @@ Details in [Webhook Implementation](/en/guides/webhooks/implementation).
     Replace the HMAC header assembly with the `POST /api/auth/token` flow (cert + clientId/clientSecret) → cache the JWT for ~10 minutes.
   </Step>
   <Step title="Swap the host">
-    From `api.spei.magenpay.io` → `api.ntxpay.com`. Payloads remain the same (aliases accepted).
+    From `api.spei.magenpay.io` → your NTX Pay production host (provided at onboarding). Payloads remain the same (aliases accepted).
   </Step>
   <Step title="Reconfigure webhooks">
     Create 1 or more `POST /api/webhooks-config`. Adjust your handler to validate the NTX Pay HMAC (header `X-NTXPay-Signature`).

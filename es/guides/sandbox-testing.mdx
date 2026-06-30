@@ -1,6 +1,6 @@
 ---
 title: 'Sandbox Testing'
-description: 'Cómo usar el ambiente sandbox del NTX Pay México para simular escenarios SPEI y OXXO sin costo ni riesgo de producción.'
+description: 'Cómo usar el ambiente sandbox del NTX Pay México para simular escenarios SPEI sin costo ni riesgo de producción.'
 ---
 
 ## What is Sandbox?
@@ -16,7 +16,7 @@ El sandbox es un **modo de operación** de tu cuenta — no un ambiente separado
 
 | Aspecto | Sandbox | Producción |
 |---|---|---|
-| Base URL | `https://api.ntxpay.com` (misma) | `https://api.ntxpay.com` |
+| Base URL | `https://sandbox.ntxpay.com` | Provista en el onboarding |
 | Cuenta | Dedicada de sandbox | Dedicada de producción |
 | Credenciales | Certificado + `clientId`/`clientSecret` propios | Certificado + credenciales propios |
 | Saldo | Simulado | Fondos reales |
@@ -68,7 +68,7 @@ El header **no altera la respuesta HTTP**. La API siempre responde `201 Created`
 <CodeGroup>
 
 ```bash cURL
-curl -X POST https://api.ntxpay.com/api/spei/cash-out \
+curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Sandbox-Scenario: error:insufficient-funds" \
   -H "Content-Type: application/json" \
@@ -82,7 +82,7 @@ curl -X POST https://api.ntxpay.com/api/spei/cash-out \
 
 ```javascript JavaScript
 const response = await axios.post(
-  'https://api.ntxpay.com/api/spei/cash-out',
+  'https://sandbox.ntxpay.com/api/spei/cash-out',
   {
     amountCentavos: 15000,
     destinationClabe: '012180001234567890',
@@ -100,7 +100,7 @@ const response = await axios.post(
 
 ```python Python
 response = requests.post(
-    "https://api.ntxpay.com/api/spei/cash-out",
+    "https://sandbox.ntxpay.com/api/spei/cash-out",
     json={
         "amountCentavos": 15000,
         "destinationClabe": "012180001234567890",
@@ -128,7 +128,6 @@ response = requests.post(
 | `error:account-blocked` | Cuenta destino bloqueada o cerrada | `FAILED` |
 | `error:duplicate-external-id` | `externalId` ya usado en otra transacción | `FAILED` |
 | `error:bank-rejected` | Banco destino rechazó la transferencia (genérico) | `FAILED` |
-| `error:oxxo-expired` | Cupón OXXO expiró sin pago | `EXPIRED` |
 
 ### Success Scenario
 
@@ -226,7 +225,6 @@ Notas:
 |---|---|---|
 | `/api/spei/cash-in` | POST | Generar CLABE desechable de cobro |
 | `/api/spei/cash-out` | POST | Enviar SPEI por CLABE |
-| `/api/oxxo/cash-in` | POST | Generar cupón OXXO |
 
 ## Behavior
 

@@ -1,6 +1,6 @@
 ---
 title: 'Evento cash_in'
-description: 'Notificação enviada quando um SPEI ou OXXO cash-in é confirmado'
+description: 'Notificação enviada quando um SPEI cash-in é confirmado'
 mode: 'wide'
 ---
 
@@ -9,7 +9,6 @@ mode: 'wide'
 O evento `cash_in` é disparado quando:
 
 - Uma transferência SPEI chega na **CLABE descartável** emitida por `POST /api/spei/cash-in` e é liquidada
-- Um pagamento OXXO emitido por `POST /api/oxxo/cash-in` é pago no caixa da loja e confirmado
 
 ## Payload
 
@@ -42,15 +41,6 @@ O evento `cash_in` é disparado quando:
 | `X-NTXPay-Signature` | `sha256=<hmac>` |
 | `X-NTXPay-Timestamp` | Unix epoch (segundos) |
 | `X-NTXPay-Delivery` | UUID único do envio |
-
-## Diferenças SPEI vs OXXO
-
-| Aspecto | SPEI | OXXO |
-|---|---|---|
-| `paymentMethod` | `SPEI` | `OXXO` |
-| `clabe` | CLABE de origem | `null` |
-| Tempo até confirmação | Segundos a minutos | Minutos a horas após pagar no caixa |
-| Identificador adicional | `referenceNumerical` | `referenceNumerical` |
 
 ## Resposta Esperada
 

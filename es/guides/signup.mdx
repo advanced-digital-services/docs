@@ -40,7 +40,7 @@ curl -X POST https://sandbox.ntxpay.com/api/signup \
 #### Request — Persona Moral (producción)
 
 ```bash
-curl -X POST https://api.ntxpay.com/api/signup \
+curl -X POST https://sandbox.ntxpay.com/api/signup \
   -H "Content-Type: application/json" \
   -d '{
     "holderName": "Acme S.A. de C.V.",
@@ -111,10 +111,9 @@ curl -X POST https://api.ntxpay.com/api/signup \
 |---|---|---|
 | Provider | `sandbox` | `smartfastpay` |
 | Confirmación SPEI | Inmediata (simulada) | Real (segundos a minutos vía Banxico) |
-| Confirmación OXXO | Inmediata | Tras lectura en caja (minutos a horas) |
 | Costo | Gratuito | Tarifas en producción |
 | Límites | Permisivos | Según contrato |
-| Endpoint base | `https://sandbox.ntxpay.com` | `https://api.ntxpay.com` |
+| Endpoint base | `https://sandbox.ntxpay.com` | Provista en el onboarding |
 
 ## Errores Comunes
 

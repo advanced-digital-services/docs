@@ -38,7 +38,7 @@ ENCODED_CERT=$(cat client.cert.pem | python3 -c "import sys,urllib.parse; print(
 #### Request
 
 ```bash
-curl -X POST https://api.ntxpay.com/api/auth/token \
+curl -X POST https://sandbox.ntxpay.com/api/auth/token \
   -H "X-SSL-Client-Cert: $ENCODED_CERT" \
   -H "Content-Type: application/json" \
   -d '{
@@ -63,7 +63,7 @@ curl -X POST https://api.ntxpay.com/api/auth/token \
 Include the `access_token` in all authenticated requests:
 
 ```bash
-curl -X GET https://api.ntxpay.com/api/balance \
+curl -X GET https://sandbox.ntxpay.com/api/balance \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -95,7 +95,7 @@ const encodedCert = encodeURIComponent(cert);
 
 async function getToken(): Promise<string> {
   const { data } = await axios.post(
-    'https://api.ntxpay.com/api/auth/token',
+    'https://sandbox.ntxpay.com/api/auth/token',
     {
       clientId: process.env.NTXPAY_CLIENT_ID,
       clientSecret: process.env.NTXPAY_CLIENT_SECRET,
