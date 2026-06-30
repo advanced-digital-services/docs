@@ -26,6 +26,14 @@
       "description": "Transferências interbancárias instantâneas mexicanas (cash-in via CLABE descartável; cash-out para CLABE)"
     },
     {
+      "name": "Balance",
+      "description": "Consulta de saldo da conta (centavos MXN)"
+    },
+    {
+      "name": "Transactions",
+      "description": "Listagem paginada de transações da conta (rate-limit 30/min)"
+    },
+    {
       "name": "Webhooks Config",
       "description": "Configuração de webhooks para notificações de eventos"
     }
@@ -93,48 +101,61 @@
       "CreateSignupInputDto": {
         "type": "object",
         "required": [
+          "email",
           "holderName",
-          "holderTaxIdPrimary",
-          "holderTaxIdPrimaryType",
-          "accountType"
+          "entityType"
         ],
         "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email de contato — vira o login (owner) do portal.",
+            "example": "dev@empresa.com"
+          },
           "holderName": {
             "type": "string",
             "minLength": 3,
             "maxLength": 255,
-            "description": "Nome do titular",
-            "example": "Maria Lopez"
+            "description": "Nome/razão do titular da conta",
+            "example": "Empresa Demo S.A. de C.V."
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "SAPI_CV",
+              "SA_CV",
+              "OTHER"
+            ],
+            "description": "Tipo de entidade jurídica mexicana. `SAPI_CV` e `SA_CV` exigem `razonSocial`.",
+            "example": "OTHER"
+          },
+          "razonSocial": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 255,
+            "description": "Razão social. **Obrigatória** quando `entityType` é `SAPI_CV` (sufixo \"S.A.P.I. de C.V.\") ou `SA_CV` (sufixo \"S.A. de C.V.\").",
+            "example": "Empresa Demo S.A. de C.V."
           },
           "holderTaxIdPrimary": {
             "type": "string",
             "minLength": 10,
             "maxLength": 20,
-            "description": "RFC (PF/PJ) ou CURP (PF)",
-            "example": "LOMA850101ABC"
+            "description": "RFC do titular (10-20 caracteres). **Opcional** no sandbox: se omitido, um RFC único de teste é gerado automaticamente.",
+            "example": "XAXX010101000"
           },
-          "holderTaxIdPrimaryType": {
+          "name": {
             "type": "string",
-            "enum": [
-              "RFC",
-              "CURP"
-            ],
-            "example": "RFC"
+            "minLength": 3,
+            "maxLength": 255,
+            "description": "Nome do contato (default = holderName).",
+            "example": "Maria Lopez"
           },
-          "accountType": {
+          "holderNickname": {
             "type": "string",
-            "enum": [
-              "PJ",
-              "PF"
-            ],
-            "description": "PJ = empresa, PF = pessoa física",
-            "example": "PF"
-          },
-          "email": {
-            "type": "string",
-            "format": "email",
-            "description": "Email de contato",
-            "example": "maria@example.com"
+            "minLength": 3,
+            "maxLength": 100,
+            "description": "Apelido / nome fantasia.",
+            "example": "Empresa Demo"
           },
           "phone": {
             "type": "string",
@@ -145,8 +166,27 @@
           },
           "isSandbox": {
             "type": "boolean",
-            "description": "Se true, cria conta em sandbox (mainProvider=sandbox). Default false.",
-            "default": false
+            "description": "Default **true**: cria conta SANDBOX self-service. `isSandbox=false` (conta de produção) NÃO é self-service — requer onboarding com KYC pelo time.",
+            "default": true,
+            "example": true
+          },
+          "holderTaxIdPrimaryType": {
+            "type": "string",
+            "enum": [
+              "RFC",
+              "CURP"
+            ],
+            "deprecated": true,
+            "description": "[DEPRECATED] Ignorado pelo backend (o tipo do documento é sempre RFC; a classificação jurídica vem de `entityType`)."
+          },
+          "accountType": {
+            "type": "string",
+            "enum": [
+              "PJ",
+              "PF"
+            ],
+            "deprecated": true,
+            "description": "[DEPRECATED] Ignorado pelo backend. Use `entityType`."
           }
         }
       },
@@ -208,18 +248,23 @@
       },
       "SpeiCashInInputDto": {
         "type": "object",
+        "required": [
+          "amountCentavos",
+          "customerName",
+          "customerEmail"
+        ],
         "properties": {
           "amountCentavos": {
             "type": "integer",
             "minimum": 1,
-            "description": "Valor em centavos MXN (mín. 1). Use ESTE campo OU `amount` (mutuamente exclusivos).",
+            "description": "Valor em centavos MXN (mín. 1).",
             "example": 50000
           },
           "externalId": {
             "type": "string",
             "minLength": 1,
             "maxLength": 100,
-            "description": "Identificador externo (idempotência)",
+            "description": "Identificador externo / referência do cliente.",
             "example": "order-abc-123"
           },
           "description": {
@@ -232,12 +277,13 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 255,
-            "description": "Nome do pagador",
+            "description": "Nome do pagador (mostrado no checkout SPEI)",
             "example": "Juan Perez"
           },
           "customerEmail": {
             "type": "string",
             "format": "email",
+            "description": "Email do pagador",
             "example": "juan@example.com"
           },
           "customerTaxId": {
@@ -246,25 +292,6 @@
             "maxLength": 20,
             "description": "RFC/CURP do pagador",
             "example": "PEPJ800101ABC"
-          },
-          "amount": {
-            "type": "string",
-            "pattern": "^\\d+\\.\\d{2}$",
-            "description": "Alias Voluti — valor como string `\"100.00\"`. Convertido para centavos. Não usar junto com `amountCentavos`.",
-            "example": "500.00"
-          },
-          "payer_name": {
-            "type": "string",
-            "maxLength": 255,
-            "description": "Alias Voluti de `customerName`. Nome do pagador.",
-            "example": "Juan Perez"
-          },
-          "conciliationId": {
-            "type": "string",
-            "maxLength": 100,
-            "pattern": "^[a-zA-Z0-9_]+$",
-            "description": "Alias Voluti de `externalId`. Aceita apenas letras, dígitos e underscore.",
-            "example": "order_abc_123"
           }
         }
       },
@@ -327,28 +354,27 @@
           "amountCentavos": {
             "type": "integer",
             "example": 50000
-          },
-          "conciliationId": {
-            "type": "string",
-            "description": "Alias Voluti — espelha `externalId` recebido na requisição (presente quando enviado).",
-            "example": "order_abc_123",
-            "nullable": true
           }
         }
       },
       "SpeiCashOutInputDto": {
         "type": "object",
+        "required": [
+          "amountCentavos",
+          "destinationClabe",
+          "beneficiaryName"
+        ],
         "properties": {
           "amountCentavos": {
             "type": "integer",
             "minimum": 1,
             "example": 50000,
-            "description": "Valor em centavos MXN (mín. 1). Use ESTE campo OU `amount`."
+            "description": "Valor em centavos MXN (mín. 1)."
           },
           "destinationClabe": {
             "type": "string",
-            "pattern": "^(\\d{18}|\\d{16})$",
-            "description": "CLABE destino. 18 dígitos (CLABE bancária) **ou** 16 dígitos (cartão de débito). Use ESTE OU `receiverClabe`.",
+            "pattern": "^\\d{18}$",
+            "description": "CLABE destino (exatamente 18 dígitos).",
             "example": "012180001234567890"
           },
           "beneficiaryName": {
@@ -370,42 +396,6 @@
             "maxLength": 255,
             "description": "Conceito/descrição (aparece para o beneficiário)",
             "example": "Pago factura 123"
-          },
-          "amount": {
-            "type": "string",
-            "pattern": "^\\d+\\.\\d{2}$",
-            "description": "Alias Voluti — valor como string `\"100.00\"`.",
-            "example": "500.00"
-          },
-          "receiverClabe": {
-            "type": "string",
-            "pattern": "^(\\d{18}|\\d{16})$",
-            "description": "Alias Voluti de `destinationClabe`.",
-            "example": "012180001234567890"
-          },
-          "receiverName": {
-            "type": "string",
-            "maxLength": 255,
-            "description": "Alias Voluti de `beneficiaryName`.",
-            "example": "Maria Lopez"
-          },
-          "bankCode": {
-            "type": "string",
-            "description": "Alias Voluti — código do banco. **Aceito e ignorado** (a CLABE já contém o ISPB).",
-            "example": "002"
-          },
-          "conciliationId": {
-            "type": "string",
-            "maxLength": 100,
-            "pattern": "^[a-zA-Z0-9_]+$",
-            "description": "Alias Voluti de `externalId`.",
-            "example": "payout_001"
-          },
-          "externalId": {
-            "type": "string",
-            "maxLength": 100,
-            "description": "Identificador externo / referência do cliente.",
-            "example": "payout-001"
           }
         }
       },
@@ -443,12 +433,6 @@
             "nullable": true,
             "format": "date-time",
             "example": "2026-05-13T12:00:00.000Z"
-          },
-          "conciliationId": {
-            "type": "string",
-            "description": "Alias Voluti — espelha `externalId` recebido na requisição.",
-            "example": "payout_001",
-            "nullable": true
           }
         }
       },
@@ -477,8 +461,7 @@
               ]
             },
             "example": [
-              "cash_in",
-              "cash_out"
+              "cash_in"
             ]
           },
           "isActive": {
@@ -527,7 +510,8 @@
           "events": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 5,
+            "maxItems": 1,
+            "description": "Um webhook assina **exatamente UM** evento. O campo é um array por compatibilidade de contrato, mas deve conter um único item.",
             "items": {
               "type": "string",
               "enum": [
@@ -539,8 +523,7 @@
               ]
             },
             "example": [
-              "cash_in",
-              "cash_out"
+              "cash_in"
             ]
           },
           "secret": {
@@ -569,8 +552,7 @@
               "type": "string"
             },
             "example": [
-              "cash_in",
-              "cash_out"
+              "cash_in"
             ]
           },
           "isActive": {
@@ -597,23 +579,42 @@
           }
         }
       },
-      "SpeiTransactionOutputDto": {
+      "GetBalanceOutputDto": {
+        "type": "object",
+        "properties": {
+          "availableCentavos": {
+            "type": "integer",
+            "description": "Saldo disponível em centavos (MXN)",
+            "example": 4873490
+          },
+          "pendingCentavos": {
+            "type": "integer",
+            "description": "Saldo pendente / bloqueado em centavos (MXN)",
+            "example": 0
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "MXN"
+            ],
+            "description": "Moeda da conta (sempre MXN)",
+            "example": "MXN"
+          }
+        }
+      },
+      "TransactionOutputDto": {
         "type": "object",
         "properties": {
           "id": {
             "type": "integer",
+            "description": "ID interno da transação",
             "example": 12345
           },
           "externalId": {
             "type": "string",
             "nullable": true,
-            "example": "order-abc-123"
-          },
-          "conciliationId": {
-            "type": "string",
-            "nullable": true,
-            "description": "Alias Voluti — espelha `externalId`.",
-            "example": "order_abc_123"
+            "description": "External / idempotency reference",
+            "example": "ext-abc-123"
           },
           "paymentMethod": {
             "type": "string",
@@ -624,7 +625,8 @@
             "enum": [
               "in",
               "out"
-            ]
+            ],
+            "example": "in"
           },
           "type": {
             "type": "string",
@@ -638,7 +640,8 @@
               "CONFIRMED",
               "FAILED",
               "EXPIRED"
-            ]
+            ],
+            "example": "CONFIRMED"
           },
           "provider": {
             "type": "string",
@@ -651,6 +654,7 @@
           "clabe": {
             "type": "string",
             "nullable": true,
+            "description": "CLABE de origem / destino",
             "example": "012180001234567890"
           },
           "createdAt": {
@@ -663,6 +667,130 @@
             "nullable": true,
             "format": "date-time",
             "example": "2026-05-12T14:31:05.000Z"
+          }
+        }
+      },
+      "PaginationMetadataDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "Total de registros",
+            "example": 142
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Limite aplicado",
+            "example": 20
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Offset aplicado",
+            "example": 0
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Existe próxima página",
+            "example": true
+          }
+        }
+      },
+      "SearchTransactionsOutputDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransactionOutputDto"
+            }
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/PaginationMetadataDto"
+          }
+        }
+      },
+      "TestWebhookInputDto": {
+        "type": "object",
+        "required": [
+          "eventType"
+        ],
+        "properties": {
+          "eventType": {
+            "type": "string",
+            "enum": [
+              "cash_in",
+              "cash_out",
+              "refund_in",
+              "refund_out",
+              "internal_transfer"
+            ],
+            "description": "Evento a simular (qual webhook recebe)."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "LIQUIDATED",
+              "PENDING",
+              "REJECTED",
+              "RETURNED"
+            ],
+            "default": "LIQUIDATED",
+            "description": "Status no payload. REJECTED/RETURNED simulam estados de ERRO."
+          },
+          "overrideUrl": {
+            "type": "string",
+            "description": "URL temporária de teste (ex.: webhook.site). Se omitida, entrega na URL configurada. A assinatura usa o secret do webhook configurado."
+          },
+          "amountCentavos": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1000,
+            "description": "Valor em centavos (default 1000 = $10)."
+          }
+        }
+      },
+      "TestWebhookOutputDto": {
+        "type": "object",
+        "properties": {
+          "delivered": {
+            "type": "boolean",
+            "description": "true = o endpoint do integrador respondeu 2xx."
+          },
+          "url": {
+            "type": "string",
+            "description": "URL para onde o webhook de teste foi enviado."
+          },
+          "eventId": {
+            "type": "string",
+            "description": "ID do evento (header x-event-id) — use para idempotência."
+          },
+          "status": {
+            "type": "string"
+          },
+          "signed": {
+            "type": "boolean",
+            "description": "true = payload assinado (X-NTXPay-Signature)."
+          },
+          "statusCode": {
+            "type": "integer",
+            "description": "Status HTTP que o endpoint do integrador respondeu (0 = erro de conexão)."
+          },
+          "timeMs": {
+            "type": "integer"
+          },
+          "signatureHeader": {
+            "type": "string",
+            "nullable": true,
+            "description": "Header X-NTXPay-Signature enviado (sha256=<hex>)."
+          },
+          "payloadSent": {
+            "type": "object",
+            "description": "Payload enviado — compare com o que seu endpoint recebeu.",
+            "additionalProperties": true
+          },
+          "merchantResponse": {
+            "nullable": true,
+            "description": "Trecho da resposta do seu endpoint."
           }
         }
       }
@@ -853,13 +981,46 @@
         }
       }
     },
-    "/api/spei/transaction/{externalId}": {
+    "/api/balance": {
       "get": {
-        "summary": "Consultar transação SPEI por externalId / conciliationId",
-        "description": "**Requer Bearer JWT**. Retorna UM registro SPEI da conta autenticada. Aceita o `externalId` enviado no cash-in/cash-out original. Compatível com `GET /api/v1/transaction/{conciliationId}/conciliation` da Voluti SPEI.",
-        "operationId": "SpeiTransactionController_get",
+        "summary": "Consultar saldo da conta",
+        "description": "**Requer Bearer JWT**. O `accountId` é extraído do token. Retorna o saldo da conta em centavos MXN.",
+        "operationId": "BalanceController_getBalance",
         "tags": [
-          "SPEI"
+          "Balance"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saldo consultado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetBalanceOutputDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token inválido ou ausente"
+          },
+          "502": {
+            "description": "account-ms indisponível"
+          }
+        }
+      }
+    },
+    "/api/transactions": {
+      "get": {
+        "summary": "Listar transações da conta autenticada",
+        "description": "**Requer Bearer JWT**. O `accountId` é extraído do token. Retorna uma lista paginada de transações da conta. **Rate-limit: 30 req/min por conta.**",
+        "operationId": "TransactionsController_search",
+        "tags": [
+          "Transactions"
         ],
         "security": [
           {
@@ -868,32 +1029,82 @@
         ],
         "parameters": [
           {
-            "name": "externalId",
-            "in": "path",
-            "required": true,
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "description": "Quantidade máxima de registros (1-100, default 20)"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "description": "Offset para paginação (default 0)"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
             "schema": {
               "type": "string"
             },
-            "description": "External ID enviado no cash-in/cash-out (também aceito como conciliationId)",
-            "example": "order-abc-123"
+            "description": "Filtro por status (PENDING | CONFIRMED | FAILED | EXPIRED)",
+            "example": "CONFIRMED"
+          },
+          {
+            "name": "paymentMethod",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtro por payment method (SPEI)",
+            "example": "SPEI"
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "in",
+                "out"
+              ]
+            },
+            "description": "Filtro por direction (in | out)",
+            "example": "in"
           }
         ],
         "responses": {
           "200": {
-            "description": "Transação encontrada",
+            "description": "Transações retornadas com sucesso",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SpeiTransactionOutputDto"
+                  "$ref": "#/components/schemas/SearchTransactionsOutputDto"
                 }
               }
             }
           },
-          "401": {
-            "description": "Token inválido"
+          "400": {
+            "description": "Parâmetros inválidos"
           },
-          "404": {
-            "description": "Transação não encontrada ou não pertence à conta"
+          "401": {
+            "description": "Token inválido ou ausente"
+          },
+          "429": {
+            "description": "Rate limit excedido (30 req/min por conta)"
           },
           "502": {
             "description": "mexico-ms indisponível"
@@ -932,7 +1143,7 @@
       },
       "post": {
         "summary": "Configurar webhook",
-        "description": "**Requer Bearer JWT**. URL HTTPS + lista de eventos (1-5) + secret opcional para assinatura HMAC. Se `secret` for omitido, o NTX Pay gera um automaticamente e retorna na resposta — guarde com segurança.",
+        "description": "**Requer Bearer JWT**. URL HTTPS + exatamente UM evento (array com 1 item) + secret opcional para assinatura HMAC. Se `secret` for omitido, o NTX Pay gera um automaticamente e retorna na resposta — guarde com segurança.",
         "operationId": "WebhooksConfigController_setup",
         "tags": [
           "Webhooks Config"
@@ -971,6 +1182,52 @@
           },
           "502": {
             "description": "account-ms indisponível"
+          }
+        }
+      }
+    },
+    "/api/webhooks-config/test": {
+      "post": {
+        "summary": "Enviar webhook de teste",
+        "description": "**Requer Bearer JWT**. Dispara um webhook de teste assinado (`X-NTXPay-Signature`) no webhook configurado para o `eventType` escolhido — ou numa `overrideUrl` (ex.: webhook.site). Use `status` `REJECTED`/`RETURNED` para simular estados de ERRO. One-shot (sem retry).",
+        "operationId": "WebhooksConfigController_test",
+        "tags": [
+          "Webhooks Config"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestWebhookInputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resultado da entrega (delivered, statusCode, payloadSent, assinatura).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestWebhookOutputDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Nenhum webhook configurado p/ o evento, ou payload inválido"
+          },
+          "401": {
+            "description": "Token inválido"
+          },
+          "502": {
+            "description": "notification-ms indisponível"
           }
         }
       }

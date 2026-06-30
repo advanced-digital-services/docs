@@ -22,7 +22,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://meu-servidor.com/webhooks/ntxpay",
-    "events": ["cash_in", "cash_out"],
+    "events": ["cash_in"],
     "secret": "whsec_abc123def456"
   }'
 ```
@@ -33,7 +33,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
 {
   "id": 42,
   "url": "https://meu-servidor.com/webhooks/ntxpay",
-  "events": ["cash_in", "cash_out"],
+  "events": ["cash_in"],
   "isActive": true,
   "secret": "whsec_abc123def456"
 }
@@ -50,7 +50,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
 </ParamField>
 
 <ParamField path="events" type="array" required>
-  Lista de 1 a 5 eventos. Valores aceitos: `cash_in`, `cash_out`, `refund_in`, `refund_out`, `internal_transfer`.
+  Um webhook assina **exatamente UM** evento — o array deve conter um único item. Valores aceitos: `cash_in`, `cash_out`, `refund_in`, `refund_out`, `internal_transfer`. Para receber mais de um tipo de evento, crie um webhook por evento.
 </ParamField>
 
 <ParamField path="secret" type="string">
@@ -71,7 +71,7 @@ curl -X GET https://sandbox.mx.ntxpay.com/api/webhooks-config \
     {
       "id": 42,
       "url": "https://meu-servidor.com/webhooks/ntxpay",
-      "events": ["cash_in", "cash_out"],
+      "events": ["cash_in"],
       "isActive": true,
       "createdAt": "2026-05-01T10:30:00.000Z"
     }
@@ -100,9 +100,9 @@ curl -X DELETE https://sandbox.mx.ntxpay.com/api/webhooks-config/42 \
 
 ## Múltiplos Webhooks
 
-Você pode configurar **vários webhooks** simultaneamente, cada um com seu conjunto de eventos. Útil para:
+Cada webhook assina exatamente um evento, então configure **um webhook por tipo de evento** que deseja receber (ex.: um para `cash_in`, outro para `cash_out`). Útil para:
 
-- Separar **logs/auditoria** (recebe todos os eventos) de **processamento** (só `cash_in`/`cash_out`)
+- Rotear cada tipo de evento para seu próprio endpoint/handler
 - Múltiplos serviços consumindo eventos diferentes
 - Ambientes internos distintos (ex.: dev vs homologação interna)
 

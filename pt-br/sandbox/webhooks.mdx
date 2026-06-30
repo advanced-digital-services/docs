@@ -23,7 +23,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://meu-servidor.com/webhooks/ntxpay",
-    "events": ["cash_in", "cash_out"]
+    "events": ["cash_in"]
   }'
 ```
 
@@ -33,7 +33,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
 {
   "id": "wh_550e8400",
   "url": "https://meu-servidor.com/webhooks/ntxpay",
-  "events": ["cash_in", "cash_out"],
+  "events": ["cash_in"],
   "secret": "whsec_a1b2c3d4...",
   "createdAt": "2026-03-26T09:00:00.000Z"
 }
@@ -96,7 +96,7 @@ Force o webhook sair como `FAILED` ou com delay:
 ```bash
 curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
   -H "Authorization: Bearer $TOKEN" \
-  -H "X-Sandbox-Scenario: delayed:30s" \
+  -H "X-Sandbox-Scenario: pending_long" \
   -H "Content-Type: application/json" \
   -d '{ ... }'
 ```

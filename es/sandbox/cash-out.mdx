@@ -25,8 +25,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
     "destinationClabe": "012180001234567890",
     "beneficiaryName": "Maria Lopez",
     "beneficiaryTaxId": "LOPM850101ABC",
-    "externalId": "payout-001",
-    "description": "Pago a proveedor"
+    "concept": "Pago a proveedor"
   }'
 ```
 
@@ -35,10 +34,11 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
 ```json
 {
   "id": 12346,
-  "externalId": "payout-001",
   "status": "PENDING",
+  "destinationClabe": "012180001234567890",
   "amountCentavos": 15000,
-  "clabe": "012180001234567890"
+  "referenceNumerical": "9876543",
+  "createdAt": "2026-03-26T10:00:00.000Z"
 }
 ```
 
@@ -71,18 +71,19 @@ Fuerza comportamientos específicos vía el header `X-Sandbox-Scenario`:
 ```bash
 curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
   -H "Authorization: Bearer $TOKEN" \
-  -H "X-Sandbox-Scenario: error:insufficient-funds" \
+  -H "X-Sandbox-Scenario: insufficient_funds" \
   -H "Content-Type: application/json" \
   -d '{ ... }'
 ```
 
-| Escenario | Cuándo usar |
-|---|---|
-| `error:insufficient-funds` | Validar UX cuando tu cliente intenta pagar sin saldo |
-| `error:invalid-clabe` | Validar parsing/validación de CLABE en tu frontend |
-| `error:account-not-found` | Validar error post-red (CLABE existe en tu base, pero no en la red SPEI) |
-| `error:bank-rejected` | Validar fallback genérico |
-| `delayed:30s` | Validar UX de "transferencia en progreso" |
+| Escenario | Cuándo usar | Webhook |
+|---|---|---|
+| `insufficient_funds` | Validar UX cuando tu cliente intenta pagar sin saldo | `FAILED` (`errorCode: INSUFFICIENT_FUNDS`) |
+| `bad_clabe` | Validar manejo de devolución por CLABE inválida | `RETURNED` (`errorCode: INVALID_CLABE`) |
+| `rejected` | Validar rechazo genérico del proveedor/red | `FAILED` |
+| `returned` | Validar transferencia devuelta por el banco contraparte | `RETURNED` |
+| `pending_long` | Validar UX de "transferencia en progreso" (~30s) | `CONFIRMED` |
+| `timeout` / `provider_5xx` | Validar fallas upstream síncronas (`504` / `503`) | — (error síncrono) |
 
 Mira [Escenarios](/es/sandbox/scenarios) para la lista completa.
 
@@ -93,10 +94,9 @@ Incluso en sandbox, algunas validaciones ocurren **antes** del retorno `201`:
 | Error síncrono | HTTP | Cuándo |
 |---|---|---|
 | `400 INVALID_AMOUNT` | `400` | `amountCentavos <= 0` |
-| `400 INVALID_CLABE_FORMAT` | `400` | CLABE con formato inválido (no-numérica, longitud incorrecta) |
-| `400 DUPLICATE_EXTERNAL_ID` | `400` | `externalId` ya usado en otra transacción de esa cuenta |
+| `400 INVALID_CLABE_FORMAT` | `400` | CLABE con formato inválido (no exactamente 18 dígitos) |
 | `400 INSUFFICIENT_FUNDS` | `400` | Saldo real por debajo de `amountCentavos + tarifa` (sin usar escenario) |
 
 <Info>
-  Los escenarios con prefijo `error:` afectan al **webhook** — la respuesta síncrona siempre es `201 PENDING`. Las validaciones estructurales como formato/duplicidad fallan de forma síncrona.
+  Los escenarios `insufficient_funds`, `bad_clabe`, `rejected` y `returned` afectan al **webhook** — la respuesta síncrona es `201 PENDING`. `timeout` y `provider_5xx` fallan de forma síncrona, igual que las validaciones estructurales (monto/formato de CLABE).
 </Info>

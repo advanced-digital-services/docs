@@ -22,7 +22,7 @@ Los webhooks permiten que NTX Pay envíe notificaciones HTTPS a tu servidor siem
 Endpoint: `POST /api/webhooks-config`. Proporcionas:
 
 - **`url`** — endpoint HTTPS en tu servidor
-- **`events`** — array con 1 a 5 eventos
+- **`events`** — array con exactamente 1 evento (un webhook se suscribe a un evento)
 - **`secret`** — opcional. Si se omite, NTX Pay genera uno automáticamente y lo retorna en la respuesta.
 
 Ver el [guía de Setup](/es/guides/webhooks/setup) para el paso a paso.

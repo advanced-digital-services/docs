@@ -21,7 +21,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://mi-servidor.com/webhooks/ntxpay",
-    "events": ["cash_in", "cash_out"],
+    "events": ["cash_in"],
     "secret": "whsec_abc123def456"
   }'
 ```
@@ -32,7 +32,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
 {
   "id": 42,
   "url": "https://mi-servidor.com/webhooks/ntxpay",
-  "events": ["cash_in", "cash_out"],
+  "events": ["cash_in"],
   "isActive": true,
   "secret": "whsec_abc123def456"
 }
@@ -49,7 +49,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
 </ParamField>
 
 <ParamField path="events" type="array" required>
-  Lista de 1 a 5 eventos. Valores aceptados: `cash_in`, `cash_out`, `refund_in`, `refund_out`, `internal_transfer`.
+  Un webhook se suscribe a **exactamente UN** evento — el array debe contener un único item. Valores aceptados: `cash_in`, `cash_out`, `refund_in`, `refund_out`, `internal_transfer`. Para recibir más de un tipo de evento, crea un webhook por evento.
 </ParamField>
 
 <ParamField path="secret" type="string">
@@ -70,7 +70,7 @@ curl -X GET https://sandbox.mx.ntxpay.com/api/webhooks-config \
     {
       "id": 42,
       "url": "https://mi-servidor.com/webhooks/ntxpay",
-      "events": ["cash_in", "cash_out"],
+      "events": ["cash_in"],
       "isActive": true,
       "createdAt": "2026-05-01T10:30:00.000Z"
     }
@@ -99,9 +99,9 @@ curl -X DELETE https://sandbox.mx.ntxpay.com/api/webhooks-config/42 \
 
 ## Múltiples Webhooks
 
-Puedes configurar **varios webhooks** simultáneamente, cada uno con su conjunto de eventos. Útil para:
+Cada webhook se suscribe a exactamente un evento, así que configura **un webhook por tipo de evento** que quieras recibir (p. ej. uno para `cash_in`, otro para `cash_out`). Útil para:
 
-- Separar **logs/auditoría** (recibe todos los eventos) de **procesamiento** (solo `cash_in`/`cash_out`)
+- Enrutar cada tipo de evento a su propio endpoint/handler
 - Ambiente de **homologación interna** vs producción
 - Múltiples servicios consumiendo eventos diferentes
 
