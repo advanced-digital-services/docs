@@ -1,0 +1,60 @@
+---
+title: 'API NTX Pay México'
+description: 'Integração com SPEI em uma única API'
+---
+
+Gateway público para integração com SPEI (transferências interbancárias instantâneas). Receba e envie via SPEI, consulte saldo e transações, receba webhooks assinados.
+
+## Ambientes
+
+| Ambiente | URL |
+|---|---|
+| Sandbox | `https://sandbox.mx.ntxpay.com` |
+| Produção | Fornecida no onboarding |
+
+## Autenticação
+
+1. `POST /api/signup` cria a conta e retorna `clientId` + `clientSecret`.
+2. `POST /api/auth/token` com certificado X.509 no header `X-SSL-Client-Cert` + credenciais retorna um JWT (validade de 10 min).
+
+O JWT vai em `Authorization: Bearer <token>` nos demais endpoints.
+
+## Valores monetários
+
+Centavos MXN, inteiros. `50000` = $500,00 MXN.
+
+## Datas
+
+ISO 8601 UTC: `2026-05-12T14:31:05.000Z`.
+
+## Códigos HTTP
+
+| Código | Significado |
+|---|---|
+| `200` / `201` | Sucesso |
+| `400` | Dados inválidos ou saldo insuficiente |
+| `401` | Token ou certificado inválido |
+| `404` | Recurso não encontrado |
+| `429` | Rate limit |
+| `502` | Provedor downstream indisponível |
+
+## Primeiros passos
+
+<CardGroup cols={2}>
+  <Card title="Primeiros Passos" href="/pt-br/guides/get-started">
+    Signup, token e primeira transação
+  </Card>
+  <Card title="SPEI" href="/pt-br/guides/spei-cash-in">
+    Cash-in e cash-out via CLABE
+  </Card>
+  <Card title="Webhooks" href="/pt-br/guides/webhooks/overview">
+    Notificações HMAC
+  </Card>
+  <Card title="Endpoints" href="/pt-br/endpoints/generate-token">
+    Schemas por endpoint
+  </Card>
+</CardGroup>
+
+## Suporte
+
+`suporte@ntxpay.com` · `https://app.ntxpay.com`

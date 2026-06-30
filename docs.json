@@ -40,10 +40,15 @@
             "tab": "API Reference",
             "groups": [
               {
-                "group": "Guide",
+                "group": "Guía",
                 "pages": [
                   "es/guides/get-started",
                   "es/guides/authentication",
+                  "es/guides/signup",
+                  "es/guides/balance",
+                  "es/guides/spei-cash-in",
+                  "es/guides/spei-cash-out",
+                  "es/guides/transactions-list",
                   "es/guides/sandbox-testing",
                   "es/guides/postman-collections"
                 ]
@@ -60,7 +65,7 @@
                 ]
               },
               {
-                "group": "Webhooks",
+                "group": "Eventos de Webhook",
                 "pages": [
                   "es/guides/webhooks/overview",
                   "es/guides/webhooks/setup",
@@ -72,13 +77,27 @@
                 ]
               },
               {
-                "group": "Endpoints",
+                "group": "Registro",
                 "pages": [
-                  "es/endpoints/signup",
-                  "es/endpoints/generate-token",
+                  "es/endpoints/signup"
+                ]
+              },
+              {
+                "group": "Autenticación",
+                "pages": [
+                  "es/endpoints/generate-token"
+                ]
+              },
+              {
+                "group": "SPEI",
+                "pages": [
                   "es/endpoints/spei-cash-in",
-                  "es/endpoints/spei-cash-out",
-                  "es/endpoints/spei-transaction",
+                  "es/endpoints/spei-cash-out"
+                ]
+              },
+              {
+                "group": "Webhooks Config",
+                "pages": [
                   "es/endpoints/webhooks-config-list",
                   "es/endpoints/webhooks-config-setup",
                   "es/endpoints/webhooks-config-delete"
@@ -99,6 +118,12 @@
                 "pages": [
                   "en/guides/get-started",
                   "en/guides/authentication",
+                  "en/guides/signup",
+                  "en/guides/balance",
+                  "en/guides/spei-cash-in",
+                  "en/guides/spei-cash-out",
+                  "en/guides/transactions-list",
+                  "en/guides/sandbox-testing",
                   "en/guides/postman-collections"
                 ]
               },
@@ -114,7 +139,7 @@
                 ]
               },
               {
-                "group": "Webhooks",
+                "group": "Webhook Events",
                 "pages": [
                   "en/guides/webhooks/overview",
                   "en/guides/webhooks/setup",
@@ -126,13 +151,27 @@
                 ]
               },
               {
-                "group": "Endpoints",
+                "group": "Signup",
                 "pages": [
-                  "en/endpoints/signup",
-                  "en/endpoints/generate-token",
+                  "en/endpoints/signup"
+                ]
+              },
+              {
+                "group": "Authentication",
+                "pages": [
+                  "en/endpoints/generate-token"
+                ]
+              },
+              {
+                "group": "SPEI",
+                "pages": [
                   "en/endpoints/spei-cash-in",
-                  "en/endpoints/spei-cash-out",
-                  "en/endpoints/spei-transaction",
+                  "en/endpoints/spei-cash-out"
+                ]
+              },
+              {
+                "group": "Webhooks Config",
+                "pages": [
                   "en/endpoints/webhooks-config-list",
                   "en/endpoints/webhooks-config-setup",
                   "en/endpoints/webhooks-config-delete"
@@ -154,6 +193,11 @@
                 "pages": [
                   "pt-br/guides/get-started",
                   "pt-br/guides/authentication",
+                  "pt-br/guides/signup",
+                  "pt-br/guides/balance",
+                  "pt-br/guides/spei-cash-in",
+                  "pt-br/guides/spei-cash-out",
+                  "pt-br/guides/transactions-list",
                   "pt-br/guides/sandbox-testing",
                   "pt-br/guides/postman-collections"
                 ]
@@ -182,6 +226,12 @@
                 ]
               },
               {
+                "group": "Cadastro",
+                "pages": [
+                  "pt-br/endpoints/signup"
+                ]
+              },
+              {
                 "group": "Autenticação",
                 "pages": [
                   "pt-br/endpoints/generate-token"
@@ -191,8 +241,7 @@
                 "group": "SPEI",
                 "pages": [
                   "pt-br/endpoints/spei-cash-in",
-                  "pt-br/endpoints/spei-cash-out",
-                  "pt-br/endpoints/spei-transaction"
+                  "pt-br/endpoints/spei-cash-out"
                 ]
               },
               {
