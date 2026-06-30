@@ -1,0 +1,145 @@
+---
+title: 'Signup'
+description: 'Criação programática de conta NTX Pay México (sandbox ou produção)'
+---
+
+## Visão Geral
+
+O endpoint `POST /api/signup` cria uma nova conta NTX Pay México. **Não requer autenticação** (sem JWT, sem certificado) — é a porta de entrada da integração.
+
+Na criação, a NTX Pay:
+
+1. Provisiona a conta no Keycloak (provedor de identidade)
+2. Aplica limites e tarifas padrão
+3. Define o `mainProvider`:
+   - `sandbox` se `isSandbox=true` (padrão — transações simuladas, self-service)
+   - `smartfastpay` caso contrário (produção — **não** é self-service; exige onboarding de KYC com o time)
+4. Emite credenciais OAuth 2.0 (`clientId` + `clientSecret`)
+5. Opcionalmente emite certificado mTLS
+
+## Endpoint
+
+### POST /api/signup
+
+#### Request — Pessoa física (sandbox)
+
+```bash
+curl -X POST https://sandbox.mx.ntxpay.com/api/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "maria@example.com",
+    "holderName": "Maria Lopez",
+    "entityType": "OTHER",
+    "phone": "+5215512345678",
+    "isSandbox": true
+  }'
+```
+
+<Note>
+  No sandbox, o `holderTaxIdPrimary` (RFC) é opcional — se omitido, um RFC de teste único é gerado automaticamente.
+</Note>
+
+#### Request — Pessoa jurídica (`SA_CV` / `SAPI_CV`)
+
+```bash
+curl -X POST https://sandbox.mx.ntxpay.com/api/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "contact@acme.mx",
+    "holderName": "Acme S.A. de C.V.",
+    "entityType": "SA_CV",
+    "razonSocial": "Acme S.A. de C.V.",
+    "holderTaxIdPrimary": "ACM850101AB1",
+    "isSandbox": true
+  }'
+```
+
+#### Response (201)
+
+```json
+{
+  "accountId": 93,
+  "publicId": "acc_550e8400-e29b-41d4-a716-446655440000",
+  "mainProvider": "sandbox",
+  "credentials": {
+    "clientId": "qr-93-550e8400",
+    "clientSecret": "a1b2c3d4e5f6g7h8"
+  },
+  "certificate": {
+    "fingerprint": "sha256:abcd1234...",
+    "expiresAt": "2027-05-13T00:00:00.000Z"
+  },
+  "message": "Account created successfully. Store clientSecret in a safe place."
+}
+```
+
+<Warning>
+  O `clientSecret` é exibido **uma única vez**, na resposta do signup. Se perdido, é necessário emitir uma nova credencial pelo painel ou contatando o suporte.
+</Warning>
+
+## Campos do Request
+
+<ParamField path="email" type="string" required>
+  E-mail de contato — torna-se o login do portal (owner).
+</ParamField>
+
+<ParamField path="holderName" type="string" required>
+  Nome / razão social do titular da conta (mínimo 3, máximo 255 caracteres).
+</ParamField>
+
+<ParamField path="entityType" type="enum" required>
+  Tipo de pessoa jurídica mexicana: `SAPI_CV`, `SA_CV` ou `OTHER`. `SAPI_CV` e `SA_CV` exigem `razonSocial`.
+</ParamField>
+
+<ParamField path="razonSocial" type="string">
+  Razão social. **Obrigatório** quando `entityType` é `SAPI_CV` (sufixo "S.A.P.I. de C.V.") ou `SA_CV` (sufixo "S.A. de C.V."). Opcional para `OTHER`.
+</ParamField>
+
+<ParamField path="holderTaxIdPrimary" type="string">
+  RFC do titular (10–20 caracteres). **Opcional no sandbox**: se omitido, um RFC de teste único é gerado automaticamente.
+</ParamField>
+
+<ParamField path="phone" type="string">
+  Telefone no formato E.164 (8–20 caracteres). Ex.: `+5215512345678`.
+</ParamField>
+
+<ParamField path="isSandbox" type="boolean" default="true">
+  Padrão **`true`** → conta sandbox self-service (provider `sandbox`, transações simuladas).
+  `false` → conta de produção (provider `smartfastpay`) — **não** é self-service; exige onboarding de KYC com o time.
+</ParamField>
+
+<ParamField path="holderTaxIdPrimaryType" type="enum" deprecated>
+  **Deprecado** — aceito mas ignorado pelo backend (o tipo de documento é sempre RFC). A classificação legal vem de `entityType`.
+</ParamField>
+
+<ParamField path="accountType" type="enum" deprecated>
+  **Deprecado** — aceito mas ignorado pelo backend. Use `entityType` no lugar.
+</ParamField>
+
+## Sandbox vs Produção
+
+| Aspecto | Sandbox | Produção |
+|---|---|---|
+| Provider | `sandbox` | `smartfastpay` |
+| Confirmação SPEI | Imediata (simulada) | Real (segundos a minutos via Banxico) |
+| Custo | Gratuito | Tarifas em produção |
+| Limites | Permissivos | Por contrato |
+| Endpoint base | `https://sandbox.mx.ntxpay.com` | Fornecido no onboarding |
+
+## Erros Comuns
+
+| Código | Causa |
+|---|---|
+| `400` | Campo obrigatório ausente (`email`/`holderName`/`entityType`), `razonSocial` ausente para `SAPI_CV`/`SA_CV`, RFC inválido, ou tax ID já em uso |
+| `502` | `account-ms` (provisionamento) indisponível — tente novamente |
+
+## Próximos Passos
+
+<CardGroup cols={2}>
+  <Card title="Autenticação" href="/pt-br/guides/authentication">
+    Use o clientId/clientSecret recém-emitidos para gerar o JWT
+  </Card>
+  <Card title="Sandbox" href="/pt-br/guides/sandbox-testing">
+    Boas práticas para testar no sandbox
+  </Card>
+</CardGroup>
