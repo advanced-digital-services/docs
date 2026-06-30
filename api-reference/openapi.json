@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "NTX Pay Public API — México",
-    "description": "API Pública NTX Pay para integração com SPEI (cash-in/cash-out) e OXXO (cash-in) no México. Todos os valores monetários são expressos em centavos MXN.",
+    "description": "API Pública NTX Pay para integração com SPEI (cash-in/cash-out) no México. Todos os valores monetários são expressos em centavos MXN.",
     "version": "1.0.0",
     "contact": {}
   },
@@ -24,10 +24,6 @@
     {
       "name": "SPEI",
       "description": "Transferências interbancárias instantâneas mexicanas (cash-in via CLABE descartável; cash-out para CLABE)"
-    },
-    {
-      "name": "OXXO",
-      "description": "Cobrança em dinheiro na rede OXXO (cash-in via boleto/código de barras)"
     },
     {
       "name": "Webhooks Config",
@@ -453,86 +449,6 @@
             "description": "Alias Voluti — espelha `externalId` recebido na requisição.",
             "example": "payout_001",
             "nullable": true
-          }
-        }
-      },
-      "OxxoCashInInputDto": {
-        "type": "object",
-        "required": [
-          "amountCentavos",
-          "customerName"
-        ],
-        "properties": {
-          "amountCentavos": {
-            "type": "integer",
-            "minimum": 1,
-            "example": 20000
-          },
-          "customerName": {
-            "type": "string",
-            "minLength": 3,
-            "maxLength": 255,
-            "example": "Juan Perez"
-          },
-          "customerTaxId": {
-            "type": "string",
-            "minLength": 10,
-            "maxLength": 20,
-            "description": "RFC/CURP (opcional)",
-            "example": "PEPJ800101ABC"
-          },
-          "externalId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100,
-            "example": "order-xyz-789"
-          }
-        }
-      },
-      "OxxoCashInOutputDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "example": 33333
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "PENDING",
-              "CONFIRMED",
-              "EXPIRED"
-            ],
-            "example": "PENDING"
-          },
-          "barcode": {
-            "type": "string",
-            "nullable": true,
-            "description": "Código de barras OXXO para pagamento no caixa",
-            "example": "012345678901234567"
-          },
-          "referenceNumerical": {
-            "type": "string",
-            "nullable": true,
-            "description": "Referência numérica OXXO",
-            "example": "12345-67890"
-          },
-          "checkoutUrl": {
-            "type": "string",
-            "nullable": true,
-            "format": "uri",
-            "description": "URL do cupom imprimível",
-            "example": "https://pay.ntxpay.com/oxxo/abc"
-          },
-          "expiresAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time",
-            "example": "2026-05-20T23:59:59.000Z"
-          },
-          "amountCentavos": {
-            "type": "integer",
-            "example": 20000
           }
         }
       },
@@ -978,52 +894,6 @@
           },
           "404": {
             "description": "Transação não encontrada ou não pertence à conta"
-          },
-          "502": {
-            "description": "mexico-ms indisponível"
-          }
-        }
-      }
-    },
-    "/api/oxxo/cash-in": {
-      "post": {
-        "summary": "Criar cobrança OXXO (cash-in)",
-        "description": "**Requer Bearer JWT**. Gera código de barras / cupom OXXO para pagamento em dinheiro nas lojas da rede OXXO. Confirmação após a leitura no caixa (delay típico de minutos a horas).",
-        "operationId": "OxxoCashInController_create",
-        "tags": [
-          "OXXO"
-        ],
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/OxxoCashInInputDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Cobrança OXXO criada (PENDING)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OxxoCashInOutputDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Dados inválidos"
-          },
-          "401": {
-            "description": "Token inválido"
           },
           "502": {
             "description": "mexico-ms indisponível"

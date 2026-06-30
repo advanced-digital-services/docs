@@ -1,6 +1,6 @@
 ---
 title: 'Primeiros Passos'
-description: 'Boas-vindas à API NTX Pay México. Este guia te leva pelos primeiros passos para integrar e começar a usar SPEI e OXXO.'
+description: 'Boas-vindas à API NTX Pay México. Este guia te leva pelos primeiros passos para integrar e começar a usar SPEI.'
 mode: 'wide'
 ---
 
@@ -26,7 +26,7 @@ A API NTX Pay México permite que sua empresa realize operações de pagamento, 
       -H "Content-Type: application/json" \
       -d '{
         "url": "https://meu-servidor.com/webhooks/ntxpay",
-        "events": ["cash_in", "cash_out"]
+        "events": ["cash_in"]
       }'
     ```
   </Step>

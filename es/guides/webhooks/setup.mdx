@@ -1,6 +1,6 @@
 ---
 title: 'Setup de Webhooks'
-description: 'Configura URLs de webhook programáticamente para SPEI y OXXO'
+description: 'Configura URLs de webhook programáticamente para SPEI'
 ---
 
 ## Visión General
@@ -16,7 +16,7 @@ La configuración de webhooks se hace vía tres endpoints:
 ### Request
 
 ```bash
-curl -X POST https://api.ntxpay.com/api/webhooks-config \
+curl -X POST https://sandbox.ntxpay.com/api/webhooks-config \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -59,7 +59,7 @@ curl -X POST https://api.ntxpay.com/api/webhooks-config \
 ## Listar Webhooks
 
 ```bash
-curl -X GET https://api.ntxpay.com/api/webhooks-config \
+curl -X GET https://sandbox.ntxpay.com/api/webhooks-config \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -86,7 +86,7 @@ curl -X GET https://api.ntxpay.com/api/webhooks-config \
 ## Remover Webhook
 
 ```bash
-curl -X DELETE https://api.ntxpay.com/api/webhooks-config/42 \
+curl -X DELETE https://sandbox.ntxpay.com/api/webhooks-config/42 \
   -H "Authorization: Bearer $TOKEN"
 ```
 

@@ -1,16 +1,16 @@
 ---
 title: 'API NTX Pay México'
-description: 'Integración con SPEI y OXXO en una única API'
+description: 'Integración con SPEI en una única API'
 ---
 
-Gateway público para integración con SPEI (transferencias interbancarias instantáneas) y OXXO (pago en efectivo). Recepción vía SPEI u OXXO, envío vía SPEI, consulta de saldo y transacciones, webhooks firmados.
+Gateway público para integración con SPEI (transferencias interbancarias instantáneas). Recepción y envío vía SPEI, consulta de saldo y transacciones, webhooks firmados.
 
 ## Ambientes
 
 | Ambiente | URL |
 |---|---|
 | Sandbox | `https://sandbox.ntxpay.com` |
-| Producción | `https://api.ntxpay.com` |
+| Producción | Provista en el onboarding |
 
 ## Autenticación
 
@@ -49,9 +49,6 @@ ISO 8601 UTC: `2026-05-12T14:31:05.000Z`.
   </Card>
   <Card title="SPEI" href="/es/guides/spei-cash-in">
     Cash-in y cash-out vía CLABE
-  </Card>
-  <Card title="OXXO" href="/es/guides/oxxo-cash-in">
-    Cash-in en efectivo
   </Card>
   <Card title="Webhooks" href="/es/guides/webhooks/overview">
     Notificaciones HMAC

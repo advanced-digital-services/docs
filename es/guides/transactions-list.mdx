@@ -1,11 +1,11 @@
 ---
 title: 'Listar Transacciones'
-description: 'Consulta el historial unificado SPEI + OXXO de tu cuenta'
+description: 'Consulta el historial SPEI de tu cuenta'
 ---
 
 ## Visión General
 
-`GET /api/transactions` retorna la lista paginada de transacciones de la cuenta autenticada, unificando **SPEI** y **OXXO** (cash-in, cash-out, refund-in, refund-out, internal_transfer). Es la fuente de verdad cuando necesitas **reconciliar** o consultar el status sin depender de webhooks.
+`GET /api/transactions` retorna la lista paginada de transacciones **SPEI** de la cuenta autenticada (cash-in, cash-out, refund-in, refund-out, internal_transfer). Es la fuente de verdad cuando necesitas **reconciliar** o consultar el status sin depender de webhooks.
 
 <Info>
   **Rate limit**: 30 requests por minuto, por cuenta. Por encima de eso, `429`.
@@ -28,13 +28,13 @@ Authorization: Bearer {token}
 | `limit` | int (1–100) | 20 | Cantidad por página |
 | `offset` | int (≥0) | 0 | Offset para paginación |
 | `status` | enum | — | `PENDING`, `CONFIRMED`, `FAILED`, `EXPIRED` |
-| `paymentMethod` | enum | — | `SPEI`, `OXXO` |
+| `paymentMethod` | enum | — | `SPEI` |
 | `direction` | enum | — | `in` (recibido), `out` (enviado) |
 
 #### Request
 
 ```bash
-curl -X GET "https://api.ntxpay.com/api/transactions?status=CONFIRMED&paymentMethod=SPEI&limit=50" \
+curl -X GET "https://sandbox.ntxpay.com/api/transactions?status=CONFIRMED&paymentMethod=SPEI&limit=50" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -75,7 +75,7 @@ let offset = 0;
 const limit = 50;
 
 while (true) {
-  const { data } = await axios.get('https://api.ntxpay.com/api/transactions', {
+  const { data } = await axios.get('https://sandbox.ntxpay.com/api/transactions', {
     headers: { Authorization: `Bearer ${token}` },
     params: { limit, offset, status: 'CONFIRMED' },
   });

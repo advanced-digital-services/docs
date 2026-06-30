@@ -79,7 +79,6 @@
                   "es/endpoints/spei-cash-in",
                   "es/endpoints/spei-cash-out",
                   "es/endpoints/spei-transaction",
-                  "es/endpoints/oxxo-cash-in",
                   "es/endpoints/webhooks-config-list",
                   "es/endpoints/webhooks-config-setup",
                   "es/endpoints/webhooks-config-delete"
@@ -134,7 +133,6 @@
                   "en/endpoints/spei-cash-in",
                   "en/endpoints/spei-cash-out",
                   "en/endpoints/spei-transaction",
-                  "en/endpoints/oxxo-cash-in",
                   "en/endpoints/webhooks-config-list",
                   "en/endpoints/webhooks-config-setup",
                   "en/endpoints/webhooks-config-delete"
@@ -198,12 +196,6 @@
                 ]
               },
               {
-                "group": "OXXO",
-                "pages": [
-                  "pt-br/endpoints/oxxo-cash-in"
-                ]
-              },
-              {
                 "group": "Webhooks Config",
                 "pages": [
                   "pt-br/endpoints/webhooks-config-list",
@@ -244,13 +236,13 @@
   },
   "metadata": {
     "og:site_name": "Documentação da API NTX Pay México",
-    "og:title": "Documentação da API NTX Pay México — SPEI e OXXO",
-    "og:description": "Integração com SPEI (cash-in via CLABE, cash-out) e OXXO (cash-in em dinheiro) através de uma única API.",
+    "og:title": "Documentação da API NTX Pay México — SPEI",
+    "og:description": "Integração com SPEI (cash-in via CLABE, cash-out) através de uma única API.",
     "og:type": "website",
     "og:locale": "pt_BR",
     "twitter:card": "summary_large_image",
     "twitter:title": "Documentação da API NTX Pay México",
-    "twitter:description": "Integração SPEI e OXXO via API REST."
+    "twitter:description": "Integração SPEI via API REST."
   },
   "seo": {
     "indexHiddenPages": false

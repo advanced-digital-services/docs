@@ -22,7 +22,7 @@ Tus credenciales de API son **estructuralmente las mismas** que usarías en prod
 |---|---|
 | Sandbox | `https://sandbox.ntxpay.com` |
 
-Todas las rutas documentadas (`/api/auth/token`, `/api/spei/cash-in`, `/api/spei/cash-out`, `/api/oxxo/cash-in`, `/api/transactions`, `/api/webhooks-config`) están disponibles exactamente en este host.
+Todas las rutas documentadas (`/api/auth/token`, `/api/spei/cash-in`, `/api/spei/cash-out`, `/api/transactions`, `/api/webhooks-config`) están disponibles exactamente en este host.
 
 ## Escenarios de prueba
 
@@ -36,7 +36,7 @@ Registra tu `webhookUrl` en la cuenta sandbox exactamente como lo harías en pro
 
 | Aspecto | Sandbox | Producción |
 |---|---|---|
-| Base URL | `https://sandbox.ntxpay.com` | `https://api.ntxpay.com` |
+| Base URL | `https://sandbox.ntxpay.com` | Provista en el onboarding |
 | Provider | `sandbox` (simulado) | Banco real (Banxico/SPEI) |
 | Saldo | Simulado | Fondos reales |
 | Confirmación SPEI cash-in | Inmediata (~1s) | Real (segundos a minutos) |

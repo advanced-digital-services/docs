@@ -6,7 +6,7 @@ mode: 'wide'
 
 ## Cómo usar
 
-Agrega el header `X-Sandbox-Scenario: <escenario>` a cualquier llamada de cash-in, cash-out u OXXO. Sin el header, el sandbox usa el escenario `success` por defecto.
+Agrega el header `X-Sandbox-Scenario: <escenario>` a cualquier llamada de cash-in o cash-out. Sin el header, el sandbox usa el escenario `success` por defecto.
 
 ```bash
 curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
@@ -44,7 +44,6 @@ curl -X POST https://sandbox.ntxpay.com/api/spei/cash-out \
 | `error:account-blocked` | `201 PENDING` | `FAILED` con `errorCode: ACCOUNT_BLOCKED` |
 | `error:duplicate-external-id` | `201 PENDING` | `FAILED` con `errorCode: DUPLICATE_EXTERNAL_ID` |
 | `error:bank-rejected` | `201 PENDING` | `FAILED` con `errorCode: BANK_REJECTED` |
-| `error:oxxo-expired` | `201 PENDING` | `EXPIRED` (solo OXXO) |
 
 ### Escenarios de atraso
 
