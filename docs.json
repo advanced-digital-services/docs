@@ -40,7 +40,7 @@
             "tab": "API Reference",
             "groups": [
               {
-                "group": "Guide",
+                "group": "Guía",
                 "pages": [
                   "es/guides/get-started",
                   "es/guides/authentication",
@@ -65,7 +65,7 @@
                 ]
               },
               {
-                "group": "Webhooks",
+                "group": "Eventos de Webhook",
                 "pages": [
                   "es/guides/webhooks/overview",
                   "es/guides/webhooks/setup",
@@ -77,12 +77,27 @@
                 ]
               },
               {
-                "group": "Endpoints",
+                "group": "Registro",
                 "pages": [
-                  "es/endpoints/signup",
-                  "es/endpoints/generate-token",
+                  "es/endpoints/signup"
+                ]
+              },
+              {
+                "group": "Autenticación",
+                "pages": [
+                  "es/endpoints/generate-token"
+                ]
+              },
+              {
+                "group": "SPEI",
+                "pages": [
                   "es/endpoints/spei-cash-in",
-                  "es/endpoints/spei-cash-out",
+                  "es/endpoints/spei-cash-out"
+                ]
+              },
+              {
+                "group": "Webhooks Config",
+                "pages": [
                   "es/endpoints/webhooks-config-list",
                   "es/endpoints/webhooks-config-setup",
                   "es/endpoints/webhooks-config-delete"
@@ -124,7 +139,7 @@
                 ]
               },
               {
-                "group": "Webhooks",
+                "group": "Webhook Events",
                 "pages": [
                   "en/guides/webhooks/overview",
                   "en/guides/webhooks/setup",
@@ -136,12 +151,27 @@
                 ]
               },
               {
-                "group": "Endpoints",
+                "group": "Signup",
                 "pages": [
-                  "en/endpoints/signup",
-                  "en/endpoints/generate-token",
+                  "en/endpoints/signup"
+                ]
+              },
+              {
+                "group": "Authentication",
+                "pages": [
+                  "en/endpoints/generate-token"
+                ]
+              },
+              {
+                "group": "SPEI",
+                "pages": [
                   "en/endpoints/spei-cash-in",
-                  "en/endpoints/spei-cash-out",
+                  "en/endpoints/spei-cash-out"
+                ]
+              },
+              {
+                "group": "Webhooks Config",
+                "pages": [
                   "en/endpoints/webhooks-config-list",
                   "en/endpoints/webhooks-config-setup",
                   "en/endpoints/webhooks-config-delete"
