@@ -46,7 +46,7 @@ curl -X GET https://sandbox.mx.ntxpay.com/api/balance \
 </ResponseField>
 
 <ResponseField name="pendingCentavos" type="integer">
-  Saldo pendiente en centavos MXN. Incluye cash-out en procesamiento y cash-in aguardando confirmación final del provider.
+  Saldo pendiente en centavos MXN. Incluye cash-out en procesamiento y cash-in aguardando confirmación final de la liquidación.
 </ResponseField>
 
 <ResponseField name="currency" type="string">
@@ -108,8 +108,5 @@ async function safeSpeiCashOut(amountCentavos: number, token: string, dto: any) 
 <CardGroup cols={2}>
   <Card title="SPEI Cash-Out" href="/es/guides/spei-cash-out">
     Envía una transferencia SPEI usando el saldo disponible
-  </Card>
-  <Card title="Transacciones" href="/es/guides/transactions-list">
-    Consulta el historial de movimientos
   </Card>
 </CardGroup>

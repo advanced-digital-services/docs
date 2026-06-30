@@ -9,7 +9,7 @@ mode: 'wide'
 Sandbox authentication uses the same two layers as production:
 
 1. **X.509 certificate (mTLS)** — issued by NTX Pay at onboarding.
-2. **OAuth 2.0 `client_credentials`** — `clientId` + `clientSecret` received during signup.
+2. **OAuth 2.0 `client_credentials`** — `clientId` + `clientSecret` received during onboarding.
 
 Together they return a **JWT** (10-minute validity) used on the remaining endpoints as `Authorization: Bearer ...`.
 

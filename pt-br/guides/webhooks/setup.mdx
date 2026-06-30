@@ -111,7 +111,7 @@ Cada webhook assina exatamente um evento, então configure **um webhook por tipo
 Antes de liberar o webhook para receber tráfego de verdade, valide seu endpoint:
 
 1. Use [webhook.site](https://webhook.site) ou [ngrok](https://ngrok.com) para inspecionar o tráfego
-2. Dispare cobranças com `X-Sandbox-Scenario` (veja [Testes em Sandbox](/pt-br/guides/sandbox-testing))
+2. Dispare cobranças com `X-Sandbox-Scenario` (veja [Cenários de Sandbox](/pt-br/sandbox/scenarios))
 3. Confira que sua aplicação:
    - Valida `X-NTXPay-Signature` corretamente
    - Retorna `200` em menos de 10 segundos

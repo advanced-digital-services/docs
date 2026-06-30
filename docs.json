@@ -44,12 +44,9 @@
                 "pages": [
                   "es/guides/get-started",
                   "es/guides/authentication",
-                  "es/guides/signup",
                   "es/guides/balance",
                   "es/guides/spei-cash-in",
                   "es/guides/spei-cash-out",
-                  "es/guides/transactions-list",
-                  "es/guides/sandbox-testing",
                   "es/guides/postman-collections"
                 ]
               },
@@ -74,12 +71,6 @@
                   "es/guides/webhooks/cash-out",
                   "es/guides/webhooks/refund-in",
                   "es/guides/webhooks/refund-out"
-                ]
-              },
-              {
-                "group": "Registro",
-                "pages": [
-                  "es/endpoints/signup"
                 ]
               },
               {
@@ -118,12 +109,9 @@
                 "pages": [
                   "en/guides/get-started",
                   "en/guides/authentication",
-                  "en/guides/signup",
                   "en/guides/balance",
                   "en/guides/spei-cash-in",
                   "en/guides/spei-cash-out",
-                  "en/guides/transactions-list",
-                  "en/guides/sandbox-testing",
                   "en/guides/postman-collections"
                 ]
               },
@@ -148,12 +136,6 @@
                   "en/guides/webhooks/cash-out",
                   "en/guides/webhooks/refund-in",
                   "en/guides/webhooks/refund-out"
-                ]
-              },
-              {
-                "group": "Signup",
-                "pages": [
-                  "en/endpoints/signup"
                 ]
               },
               {
@@ -193,12 +175,9 @@
                 "pages": [
                   "pt-br/guides/get-started",
                   "pt-br/guides/authentication",
-                  "pt-br/guides/signup",
                   "pt-br/guides/balance",
                   "pt-br/guides/spei-cash-in",
                   "pt-br/guides/spei-cash-out",
-                  "pt-br/guides/transactions-list",
-                  "pt-br/guides/sandbox-testing",
                   "pt-br/guides/postman-collections"
                 ]
               },
@@ -223,12 +202,6 @@
                   "pt-br/guides/webhooks/cash-out",
                   "pt-br/guides/webhooks/refund-in",
                   "pt-br/guides/webhooks/refund-out"
-                ]
-              },
-              {
-                "group": "Cadastro",
-                "pages": [
-                  "pt-br/endpoints/signup"
                 ]
               },
               {

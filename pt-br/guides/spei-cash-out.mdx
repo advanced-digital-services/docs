@@ -5,7 +5,7 @@ description: 'Envie transferências SPEI para qualquer CLABE'
 
 ## Visão Geral
 
-O **cash-out SPEI** envia uma transferência interbancária para uma **CLABE de destino**. O saldo da conta é debitado e a NTX Pay encaminha ao provedor (`smartfastpay` em produção, `sandbox` para testes). A confirmação chega via webhook `cash_out`.
+O **cash-out SPEI** envia uma transferência interbancária para uma **CLABE de destino**. O saldo da conta é debitado e a NTX Pay processa a transferência na rede SPEI. A confirmação chega via webhook `cash_out`.
 
 ## Endpoint
 
@@ -89,7 +89,7 @@ if (balance.availableCentavos < amountCentavos) {
 |---|---|
 | `PENDING` | Cash-out aceito, aguardando liquidação SPEI |
 | `CONFIRMED` | Liquidado no Banxico |
-| `FAILED` | Rejeitado pelo provedor ou pela rede SPEI |
+| `FAILED` | Rejeitado pela rede SPEI |
 
 ## Códigos de Erro
 
@@ -97,7 +97,7 @@ if (balance.availableCentavos < amountCentavos) {
 |---|---|
 | `400` | Saldo insuficiente, CLABE inválida, payload inválido |
 | `401` | Token inválido |
-| `502` | mexico-ms / provedor indisponível — não tente novamente sem verificar o status via `GET /api/transactions` |
+| `502` | Falha temporária no processamento — não tente novamente sem verificar o status via `GET /api/transactions` |
 
 ## Exemplo em Node.js com Retry
 
@@ -125,8 +125,5 @@ async function speiCashOut(token: string, dto: any) {
 <CardGroup cols={2}>
   <Card title="Webhook cash_out" href="/pt-br/guides/webhooks/cash-out">
     Detalhes do payload do webhook de liquidação
-  </Card>
-  <Card title="Listar Transações" href="/pt-br/guides/transactions-list">
-    Verifique o status sem depender do webhook
   </Card>
 </CardGroup>

@@ -25,7 +25,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
     "destinationClabe": "012180001234567890",
     "beneficiaryName": "Maria Lopez",
     "beneficiaryTaxId": "LOPM850101ABC",
-    "concept": "Pagamento de fornecedor"
+    "concept": "Pagamento de fatura"
   }'
 ```
 
@@ -80,7 +80,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
 |---|---|---|
 | `insufficient_funds` | Validar UX quando seu cliente tenta pagar sem saldo | `FAILED` (`errorCode: INSUFFICIENT_FUNDS`) |
 | `bad_clabe` | Validar tratamento de devolução por CLABE inválida | `RETURNED` (`errorCode: INVALID_CLABE`) |
-| `rejected` | Validar rejeição genérica do provedor/rede | `FAILED` |
+| `rejected` | Validar rejeição genérica da rede SPEI | `FAILED` |
 | `returned` | Validar transferência estornada pelo banco contraparte | `RETURNED` |
 | `pending_long` | Validar UX de "transferência em andamento" (~30s) | `CONFIRMED` |
 | `timeout` / `provider_5xx` | Validar falhas upstream síncronas (`504` / `503`) | — (erro síncrono) |

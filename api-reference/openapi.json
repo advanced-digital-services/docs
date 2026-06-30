@@ -18,20 +18,12 @@
       "description": "Geração de token via certificado X.509 + clientId/clientSecret"
     },
     {
-      "name": "Signup",
-      "description": "Criação de conta (sandbox ou produção)"
-    },
-    {
       "name": "SPEI",
       "description": "Transferências interbancárias instantâneas mexicanas (cash-in via CLABE descartável; cash-out para CLABE)"
     },
     {
       "name": "Balance",
       "description": "Consulta de saldo da conta (centavos MXN)"
-    },
-    {
-      "name": "Transactions",
-      "description": "Listagem paginada de transações da conta (rate-limit 30/min)"
     },
     {
       "name": "Webhooks Config",
@@ -63,7 +55,7 @@
         "properties": {
           "clientId": {
             "type": "string",
-            "description": "OAuth 2.0 client ID emitido durante o signup",
+            "description": "OAuth 2.0 client ID da sua conta NTX Pay (fornecido no onboarding)",
             "example": "qr-93-550e8400"
           },
           "clientSecret": {
@@ -95,154 +87,6 @@
           "scope": {
             "type": "string",
             "example": "email profile"
-          }
-        }
-      },
-      "CreateSignupInputDto": {
-        "type": "object",
-        "required": [
-          "email",
-          "holderName",
-          "entityType"
-        ],
-        "properties": {
-          "email": {
-            "type": "string",
-            "format": "email",
-            "description": "Email de contato — vira o login (owner) do portal.",
-            "example": "dev@empresa.com"
-          },
-          "holderName": {
-            "type": "string",
-            "minLength": 3,
-            "maxLength": 255,
-            "description": "Nome/razão do titular da conta",
-            "example": "Empresa Demo S.A. de C.V."
-          },
-          "entityType": {
-            "type": "string",
-            "enum": [
-              "SAPI_CV",
-              "SA_CV",
-              "OTHER"
-            ],
-            "description": "Tipo de entidade jurídica mexicana. `SAPI_CV` e `SA_CV` exigem `razonSocial`.",
-            "example": "OTHER"
-          },
-          "razonSocial": {
-            "type": "string",
-            "minLength": 3,
-            "maxLength": 255,
-            "description": "Razão social. **Obrigatória** quando `entityType` é `SAPI_CV` (sufixo \"S.A.P.I. de C.V.\") ou `SA_CV` (sufixo \"S.A. de C.V.\").",
-            "example": "Empresa Demo S.A. de C.V."
-          },
-          "holderTaxIdPrimary": {
-            "type": "string",
-            "minLength": 10,
-            "maxLength": 20,
-            "description": "RFC do titular (10-20 caracteres). **Opcional** no sandbox: se omitido, um RFC único de teste é gerado automaticamente.",
-            "example": "XAXX010101000"
-          },
-          "name": {
-            "type": "string",
-            "minLength": 3,
-            "maxLength": 255,
-            "description": "Nome do contato (default = holderName).",
-            "example": "Maria Lopez"
-          },
-          "holderNickname": {
-            "type": "string",
-            "minLength": 3,
-            "maxLength": 100,
-            "description": "Apelido / nome fantasia.",
-            "example": "Empresa Demo"
-          },
-          "phone": {
-            "type": "string",
-            "minLength": 8,
-            "maxLength": 20,
-            "description": "Telefone E.164",
-            "example": "+5215512345678"
-          },
-          "isSandbox": {
-            "type": "boolean",
-            "description": "Default **true**: cria conta SANDBOX self-service. `isSandbox=false` (conta de produção) NÃO é self-service — requer onboarding com KYC pelo time.",
-            "default": true,
-            "example": true
-          },
-          "holderTaxIdPrimaryType": {
-            "type": "string",
-            "enum": [
-              "RFC",
-              "CURP"
-            ],
-            "deprecated": true,
-            "description": "[DEPRECATED] Ignorado pelo backend (o tipo do documento é sempre RFC; a classificação jurídica vem de `entityType`)."
-          },
-          "accountType": {
-            "type": "string",
-            "enum": [
-              "PJ",
-              "PF"
-            ],
-            "deprecated": true,
-            "description": "[DEPRECATED] Ignorado pelo backend. Use `entityType`."
-          }
-        }
-      },
-      "SignupCertificateDto": {
-        "type": "object",
-        "properties": {
-          "fingerprint": {
-            "type": "string",
-            "example": "sha256:abcd1234..."
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2027-05-13T00:00:00.000Z"
-          }
-        }
-      },
-      "CreateSignupOutputDto": {
-        "type": "object",
-        "properties": {
-          "accountId": {
-            "type": "integer",
-            "example": 93
-          },
-          "publicId": {
-            "type": "string",
-            "example": "acc_550e8400-e29b-41d4-a716-446655440000"
-          },
-          "mainProvider": {
-            "type": "string",
-            "enum": [
-              "smartfastpay",
-              "sandbox"
-            ]
-          },
-          "credentials": {
-            "type": "object",
-            "properties": {
-              "clientId": {
-                "type": "string",
-                "example": "qr-93-550e8400"
-              },
-              "clientSecret": {
-                "type": "string",
-                "description": "Secret OAuth 2.0 — exibido **uma única vez**. Guarde em local seguro.",
-                "example": "a1b2c3d4e5f6g7h8"
-              }
-            }
-          },
-          "certificate": {
-            "$ref": "#/components/schemas/SignupCertificateDto",
-            "description": "Certificado mTLS, quando emitido"
-          },
-          "message": {
-            "type": "string",
-            "example": "Conta criada com sucesso. Guarde clientSecret em local seguro."
           }
         }
       },
@@ -602,113 +446,6 @@
           }
         }
       },
-      "TransactionOutputDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "description": "ID interno da transação",
-            "example": 12345
-          },
-          "externalId": {
-            "type": "string",
-            "nullable": true,
-            "description": "External / idempotency reference",
-            "example": "ext-abc-123"
-          },
-          "paymentMethod": {
-            "type": "string",
-            "example": "SPEI"
-          },
-          "direction": {
-            "type": "string",
-            "enum": [
-              "in",
-              "out"
-            ],
-            "example": "in"
-          },
-          "type": {
-            "type": "string",
-            "description": "cash_in, cash_out, refund_in, refund_out, internal_transfer",
-            "example": "cash_in"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "PENDING",
-              "CONFIRMED",
-              "FAILED",
-              "EXPIRED"
-            ],
-            "example": "CONFIRMED"
-          },
-          "provider": {
-            "type": "string",
-            "example": "smartfastpay"
-          },
-          "amountCentavos": {
-            "type": "integer",
-            "example": 50000
-          },
-          "clabe": {
-            "type": "string",
-            "nullable": true,
-            "description": "CLABE de origem / destino",
-            "example": "012180001234567890"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-05-12T14:30:00.000Z"
-          },
-          "confirmedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time",
-            "example": "2026-05-12T14:31:05.000Z"
-          }
-        }
-      },
-      "PaginationMetadataDto": {
-        "type": "object",
-        "properties": {
-          "total": {
-            "type": "integer",
-            "description": "Total de registros",
-            "example": 142
-          },
-          "limit": {
-            "type": "integer",
-            "description": "Limite aplicado",
-            "example": 20
-          },
-          "offset": {
-            "type": "integer",
-            "description": "Offset aplicado",
-            "example": 0
-          },
-          "hasMore": {
-            "type": "boolean",
-            "description": "Existe próxima página",
-            "example": true
-          }
-        }
-      },
-      "SearchTransactionsOutputDto": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TransactionOutputDto"
-            }
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/PaginationMetadataDto"
-          }
-        }
-      },
       "TestWebhookInputDto": {
         "type": "object",
         "required": [
@@ -851,44 +588,6 @@
         }
       }
     },
-    "/api/signup": {
-      "post": {
-        "summary": "Criar nova conta (sandbox ou produção)",
-        "description": "Endpoint **público** (sem JWT, sem certificado). Cria conta NTX Pay MX, configura Keycloak, limites e taxas default. Se `isSandbox=true`, conta usa provider `sandbox` (transações simuladas); caso contrário, `smartfastpay` (produção).",
-        "operationId": "SignupController_create",
-        "tags": [
-          "Signup"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateSignupInputDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Conta criada com sucesso",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CreateSignupOutputDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Dados inválidos ou tax ID já em uso"
-          },
-          "502": {
-            "description": "account-ms indisponível"
-          }
-        }
-      }
-    },
     "/api/spei/cash-in": {
       "post": {
         "summary": "Criar cobrança SPEI (cash-in)",
@@ -1010,104 +709,6 @@
           },
           "502": {
             "description": "account-ms indisponível"
-          }
-        }
-      }
-    },
-    "/api/transactions": {
-      "get": {
-        "summary": "Listar transações da conta autenticada",
-        "description": "**Requer Bearer JWT**. O `accountId` é extraído do token. Retorna uma lista paginada de transações da conta. **Rate-limit: 30 req/min por conta.**",
-        "operationId": "TransactionsController_search",
-        "tags": [
-          "Transactions"
-        ],
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            },
-            "description": "Quantidade máxima de registros (1-100, default 20)"
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 0
-            },
-            "description": "Offset para paginação (default 0)"
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Filtro por status (PENDING | CONFIRMED | FAILED | EXPIRED)",
-            "example": "CONFIRMED"
-          },
-          {
-            "name": "paymentMethod",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Filtro por payment method (SPEI)",
-            "example": "SPEI"
-          },
-          {
-            "name": "direction",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "in",
-                "out"
-              ]
-            },
-            "description": "Filtro por direction (in | out)",
-            "example": "in"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Transações retornadas com sucesso",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SearchTransactionsOutputDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Parâmetros inválidos"
-          },
-          "401": {
-            "description": "Token inválido ou ausente"
-          },
-          "429": {
-            "description": "Rate limit excedido (30 req/min por conta)"
-          },
-          "502": {
-            "description": "mexico-ms indisponível"
           }
         }
       }
