@@ -19,10 +19,9 @@ The **sandbox** is an isolated environment with simulated transactions. Useful f
 curl -X POST https://sandbox.mx.ntxpay.com/api/signup \
   -H "Content-Type: application/json" \
   -d '{
+    "email": "dev@example.com",
     "holderName": "Test",
-    "holderTaxIdPrimary": "TEST850101ABC",
-    "holderTaxIdPrimaryType": "RFC",
-    "accountType": "PF",
+    "entityType": "OTHER",
     "isSandbox": true
   }'
 ```

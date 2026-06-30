@@ -11,50 +11,47 @@ Add the header `X-Sandbox-Scenario: <scenario>` to any cash-in or cash-out call.
 ```bash
 curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
   -H "Authorization: Bearer $TOKEN" \
-  -H "X-Sandbox-Scenario: error:insufficient-funds" \
+  -H "X-Sandbox-Scenario: insufficient_funds" \
   -H "Content-Type: application/json" \
   -d '{
     "amountCentavos": 15000,
     "destinationClabe": "012180001234567890",
-    "beneficiaryName": "Maria Lopez",
-    "externalId": "test-error-001"
+    "beneficiaryName": "Maria Lopez"
   }'
 ```
 
 <Warning>
-  The header only controls the **asynchronous webhook**. The HTTP response is always `201 Created` with `status: PENDING`, regardless of the scenario. The final outcome (`CONFIRMED`, `FAILED`, or `EXPIRED`) arrives in the webhook ~1 second later.
+  Most scenarios control the **asynchronous webhook**: the HTTP response is `201 Created` with `status: PENDING`, and the final outcome (`CONFIRMED`, `FAILED`, or `RETURNED`) arrives in the webhook. The exceptions are `timeout` and `provider_5xx`, which fail on the **synchronous** HTTP response itself.
 </Warning>
 
 ## Available scenarios
 
-### Success scenarios
+The canonical scenario values are: `success`, `pending_long`, `rejected`, `returned`, `insufficient_funds`, `bad_clabe`, `timeout`, `provider_5xx`.
 
-| Header Value | Synchronous behavior | Webhook |
+### Asynchronous outcome scenarios
+
+These return `201 PENDING` synchronously; the final state arrives via webhook.
+
+| Header Value | Webhook outcome | Notes |
 |---|---|---|
-| `success` (default) | `201 PENDING` | `CONFIRMED` in ~1s |
-| _(no header)_ | `201 PENDING` | `CONFIRMED` in ~1s |
+| `success` (default) | `CONFIRMED` in ~1s | Also used when no header is sent |
+| `pending_long` | `CONFIRMED` after ~30s | Tests slow settlement |
+| `rejected` | `FAILED` | Provider / SPEI network rejected the transfer |
+| `returned` | `RETURNED` | Accepted, then reversed by the counterpart bank |
+| `insufficient_funds` | `FAILED` with `errorCode: INSUFFICIENT_FUNDS` | **Cash-out only** |
+| `bad_clabe` | `RETURNED` with `errorCode: INVALID_CLABE` | **Cash-out only** — accepted, then returned |
 
-### Error scenarios
+### Synchronous error scenarios
 
-| Header Value | Synchronous behavior | Webhook |
-|---|---|---|
-| `error:insufficient-funds` | `201 PENDING` | `FAILED` with `errorCode: INSUFFICIENT_FUNDS` |
-| `error:invalid-clabe` | `201 PENDING` | `FAILED` with `errorCode: INVALID_CLABE` |
-| `error:account-not-found` | `201 PENDING` | `FAILED` with `errorCode: ACCOUNT_NOT_FOUND` |
-| `error:account-blocked` | `201 PENDING` | `FAILED` with `errorCode: ACCOUNT_BLOCKED` |
-| `error:duplicate-external-id` | `201 PENDING` | `FAILED` with `errorCode: DUPLICATE_EXTERNAL_ID` |
-| `error:bank-rejected` | `201 PENDING` | `FAILED` with `errorCode: BANK_REJECTED` |
+These fail on the HTTP response itself — no webhook is sent.
 
-### Delay scenarios
-
-| Header Value | Synchronous behavior | Webhook |
-|---|---|---|
-| `delayed:5s` | `201 PENDING` | `CONFIRMED` after +5s |
-| `delayed:30s` | `201 PENDING` | `CONFIRMED` after +30s |
-| `delayed:60s` | `201 PENDING` | `CONFIRMED` after +60s |
+| Header Value | Synchronous response |
+|---|---|
+| `timeout` | Upstream timeout (`504`) after ~16s |
+| `provider_5xx` | `503` provider unavailable |
 
 <Info>
-  The maximum allowed delay is **120 seconds** — higher values are truncated automatically.
+  **Cash-in restrictions:** `insufficient_funds` and `bad_clabe` do not apply to cash-in (there's no balance to debit, and the deposit CLABE is system-generated). Sending either on a cash-in returns `400` with code `SCENARIO_NOT_APPLICABLE`.
 </Info>
 
 ## Example: success webhook

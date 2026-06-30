@@ -12,8 +12,8 @@ Al crearla, NTX Pay:
 1. Configura la cuenta en Keycloak (identity provider)
 2. Aplica límites y tarifas default
 3. Define el `mainProvider`:
-   - `sandbox` si `isSandbox=true` (transacciones simuladas)
-   - `smartfastpay` en caso contrario (producción)
+   - `sandbox` si `isSandbox=true` (default — self-service con transacciones simuladas)
+   - `smartfastpay` en caso contrario (producción — **no** es self-service; requiere onboarding con KYC por el equipo)
 4. Emite credenciales OAuth 2.0 (`clientId` + `clientSecret`)
 5. Opcionalmente emite certificado mTLS
 
@@ -27,27 +27,30 @@ Al crearla, NTX Pay:
 curl -X POST https://sandbox.mx.ntxpay.com/api/signup \
   -H "Content-Type: application/json" \
   -d '{
-    "holderName": "Maria Lopez",
-    "holderTaxIdPrimary": "LOMA850101ABC",
-    "holderTaxIdPrimaryType": "RFC",
-    "accountType": "PF",
     "email": "maria@example.com",
+    "holderName": "Maria Lopez",
+    "entityType": "OTHER",
     "phone": "+5215512345678",
     "isSandbox": true
   }'
 ```
 
-#### Request — Persona Moral (producción)
+<Note>
+  En sandbox, `holderTaxIdPrimary` (RFC) es opcional — si se omite, se genera automáticamente un RFC de prueba único.
+</Note>
+
+#### Request — Persona Moral (`SA_CV` / `SAPI_CV`)
 
 ```bash
 curl -X POST https://sandbox.mx.ntxpay.com/api/signup \
   -H "Content-Type: application/json" \
   -d '{
+    "email": "contacto@acme.mx",
     "holderName": "Acme S.A. de C.V.",
+    "entityType": "SA_CV",
+    "razonSocial": "Acme S.A. de C.V.",
     "holderTaxIdPrimary": "ACM850101AB1",
-    "holderTaxIdPrimaryType": "RFC",
-    "accountType": "PJ",
-    "email": "contacto@acme.mx"
+    "isSandbox": true
   }'
 ```
 
@@ -76,33 +79,41 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/signup \
 
 ## Campos del Request
 
+<ParamField path="email" type="string" required>
+  Email de contacto — se convierte en el login (owner) del portal.
+</ParamField>
+
 <ParamField path="holderName" type="string" required>
-  Nombre completo del titular (mínimo 3, máximo 255 caracteres).
+  Nombre / razón del titular de la cuenta (mínimo 3, máximo 255 caracteres).
 </ParamField>
 
-<ParamField path="holderTaxIdPrimary" type="string" required>
-  RFC (Persona Física o Moral) o CURP (Persona Física). 10–20 caracteres.
+<ParamField path="entityType" type="enum" required>
+  Tipo de entidad jurídica mexicana: `SAPI_CV`, `SA_CV` u `OTHER`. `SAPI_CV` y `SA_CV` exigen `razonSocial`.
 </ParamField>
 
-<ParamField path="holderTaxIdPrimaryType" type="enum" required>
-  `RFC` o `CURP`.
+<ParamField path="razonSocial" type="string">
+  Razón social. **Obligatoria** cuando `entityType` es `SAPI_CV` (sufijo "S.A.P.I. de C.V.") o `SA_CV` (sufijo "S.A. de C.V."). Opcional para `OTHER`.
 </ParamField>
 
-<ParamField path="accountType" type="enum" required>
-  `PJ` (persona moral) o `PF` (persona física).
-</ParamField>
-
-<ParamField path="email" type="string">
-  Email de contacto. Opcional, pero recomendado.
+<ParamField path="holderTaxIdPrimary" type="string">
+  RFC del titular (10–20 caracteres). **Opcional en sandbox**: si se omite, se genera automáticamente un RFC de prueba único.
 </ParamField>
 
 <ParamField path="phone" type="string">
   Teléfono en formato E.164 (8–20 caracteres). Ej.: `+5215512345678`.
 </ParamField>
 
-<ParamField path="isSandbox" type="boolean" default="false">
-  `true` → cuenta en ambiente sandbox (provider `sandbox`, transacciones simuladas).
-  `false` → cuenta de producción (provider `smartfastpay`).
+<ParamField path="isSandbox" type="boolean" default="true">
+  Default **`true`** → cuenta sandbox self-service (provider `sandbox`, transacciones simuladas).
+  `false` → cuenta de producción (provider `smartfastpay`) — **no** es self-service; requiere onboarding con KYC por el equipo.
+</ParamField>
+
+<ParamField path="holderTaxIdPrimaryType" type="enum" deprecated>
+  **Deprecado** — aceptado pero ignorado por el backend (el tipo de documento es siempre RFC). La clasificación jurídica viene de `entityType`.
+</ParamField>
+
+<ParamField path="accountType" type="enum" deprecated>
+  **Deprecado** — aceptado pero ignorado por el backend. Usa `entityType`.
 </ParamField>
 
 ## Sandbox vs Producción
@@ -119,7 +130,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/signup \
 
 | Código | Causa |
 |---|---|
-| `400` | RFC/CURP inválido, accountType inválido, o tax ID ya en uso |
+| `400` | Falta un campo obligatorio (`email`/`holderName`/`entityType`), falta `razonSocial` para `SAPI_CV`/`SA_CV`, RFC inválido, o tax ID ya en uso |
 | `502` | `account-ms` (provisión) no disponible — reintentar |
 
 ## Próximos Pasos

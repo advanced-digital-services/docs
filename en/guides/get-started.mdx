@@ -25,7 +25,7 @@ The NTX Pay México API lets your company perform payment operations, check bala
       -H "Content-Type: application/json" \
       -d '{
         "url": "https://my-server.com/webhooks/ntxpay",
-        "events": ["cash_in", "cash_out"]
+        "events": ["cash_in"]
       }'
     ```
   </Step>
@@ -38,12 +38,13 @@ The NTX Pay México API lets your company perform payment operations, check bala
     ```bash
     curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
       -H "Authorization: Bearer $TOKEN" \
-      -H "X-Sandbox-Scenario: cash_in_failed" \
+      -H "X-Sandbox-Scenario: rejected" \
       -H "Content-Type: application/json" \
       -d '{
         "amountCentavos": 50000,
         "externalId": "order-001",
-        "customerName": "Juan Perez"
+        "customerName": "Juan Perez",
+        "customerEmail": "juan@example.com"
       }'
     ```
   </Step>

@@ -72,12 +72,12 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
   Charge description (up to 255 characters).
 </ParamField>
 
-<ParamField path="customerName" type="string">
-  Payer name (up to 255 characters). Useful for reconciliation.
+<ParamField path="customerName" type="string" required>
+  Payer name (1–255 characters), shown on the SPEI checkout.
 </ParamField>
 
-<ParamField path="customerEmail" type="string">
-  Payer email. If provided along with `checkoutUrl`, can trigger automatic link sending.
+<ParamField path="customerEmail" type="string" required>
+  Payer email (valid email format).
 </ParamField>
 
 <ParamField path="customerTaxId" type="string">

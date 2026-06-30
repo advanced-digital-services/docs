@@ -21,7 +21,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://my-server.com/webhooks/ntxpay",
-    "events": ["cash_in", "cash_out"],
+    "events": ["cash_in"],
     "secret": "whsec_abc123def456"
   }'
 ```
@@ -32,7 +32,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
 {
   "id": 42,
   "url": "https://my-server.com/webhooks/ntxpay",
-  "events": ["cash_in", "cash_out"],
+  "events": ["cash_in"],
   "isActive": true,
   "secret": "whsec_abc123def456"
 }
@@ -49,7 +49,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
 </ParamField>
 
 <ParamField path="events" type="array" required>
-  List of 1 to 5 events. Accepted values: `cash_in`, `cash_out`, `refund_in`, `refund_out`, `internal_transfer`.
+  A webhook subscribes to **exactly ONE** event — the array must contain a single item. Accepted values: `cash_in`, `cash_out`, `refund_in`, `refund_out`, `internal_transfer`. To receive more than one event type, create one webhook per event.
 </ParamField>
 
 <ParamField path="secret" type="string">
@@ -70,7 +70,7 @@ curl -X GET https://sandbox.mx.ntxpay.com/api/webhooks-config \
     {
       "id": 42,
       "url": "https://my-server.com/webhooks/ntxpay",
-      "events": ["cash_in", "cash_out"],
+      "events": ["cash_in"],
       "isActive": true,
       "createdAt": "2026-05-01T10:30:00.000Z"
     }
@@ -99,9 +99,9 @@ curl -X DELETE https://sandbox.mx.ntxpay.com/api/webhooks-config/42 \
 
 ## Multiple Webhooks
 
-You can configure **multiple webhooks** at the same time, each with its own event set. Useful for:
+Each webhook subscribes to exactly one event, so configure **one webhook per event type** you want to receive (e.g. one for `cash_in`, another for `cash_out`). Useful for:
 
-- Separating **logs/audit** (receives all events) from **processing** (only `cash_in`/`cash_out`)
+- Routing each event type to its own endpoint/handler
 - Internal **homologation** vs production environment
 - Multiple services consuming different events
 

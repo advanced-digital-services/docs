@@ -54,14 +54,15 @@ El sandbox es un **modo de operación** de tu cuenta — no un ambiente separado
 
 ## How It Works
 
-El header **no altera la respuesta HTTP**. La API siempre responde `201 Created` con `status: "PENDING"`. El scenario afecta exclusivamente el **webhook asíncrono** disparado ~1 segundo después.
+En la mayoría de los escenarios el header **no altera la respuesta HTTP**: la API responde `201 Created` con `status: "PENDING"` y el scenario afecta el **webhook asíncrono** disparado ~1 segundo después. Las excepciones son `timeout` y `provider_5xx`, que fallan en la propia respuesta HTTP síncrona.
 
 | Request | HTTP Response | Webhook (~1s después) |
 |---|---|---|
 | Sin `X-Sandbox-Scenario` | `201 PENDING` | `CONFIRMED` |
 | `X-Sandbox-Scenario: success` | `201 PENDING` | `CONFIRMED` |
-| `X-Sandbox-Scenario: error:insufficient-funds` | `201 PENDING` | `FAILED` con `errorCode` |
-| `X-Sandbox-Scenario: delayed:5s` | `201 PENDING` | `CONFIRMED` con +5s de delay |
+| `X-Sandbox-Scenario: insufficient_funds` | `201 PENDING` | `FAILED` con `errorCode` (solo cash-out) |
+| `X-Sandbox-Scenario: pending_long` | `201 PENDING` | `CONFIRMED` tras ~30s |
+| `X-Sandbox-Scenario: provider_5xx` | `503` (síncrono) | — |
 
 ## How to Use
 
@@ -70,13 +71,12 @@ El header **no altera la respuesta HTTP**. La API siempre responde `201 Created`
 ```bash cURL
 curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
   -H "Authorization: Bearer $TOKEN" \
-  -H "X-Sandbox-Scenario: error:insufficient-funds" \
+  -H "X-Sandbox-Scenario: insufficient_funds" \
   -H "Content-Type: application/json" \
   -d '{
     "amountCentavos": 15000,
     "destinationClabe": "012180001234567890",
-    "beneficiaryName": "Maria Lopez",
-    "externalId": "test-error-001"
+    "beneficiaryName": "Maria Lopez"
   }'
 ```
 
@@ -87,12 +87,11 @@ const response = await axios.post(
     amountCentavos: 15000,
     destinationClabe: '012180001234567890',
     beneficiaryName: 'Maria Lopez',
-    externalId: 'test-error-001',
   },
   {
     headers: {
       Authorization: `Bearer ${token}`,
-      'X-Sandbox-Scenario': 'error:insufficient-funds',
+      'X-Sandbox-Scenario': 'insufficient_funds',
     },
   }
 );
@@ -105,11 +104,10 @@ response = requests.post(
         "amountCentavos": 15000,
         "destinationClabe": "012180001234567890",
         "beneficiaryName": "Maria Lopez",
-        "externalId": "test-error-001",
     },
     headers={
         "Authorization": f"Bearer {token}",
-        "X-Sandbox-Scenario": "error:insufficient-funds",
+        "X-Sandbox-Scenario": "insufficient_funds",
     },
 )
 ```
@@ -118,34 +116,28 @@ response = requests.post(
 
 ## Available Scenarios
 
-### Error Scenarios
+Valores canónicos: `success`, `pending_long`, `rejected`, `returned`, `insufficient_funds`, `bad_clabe`, `timeout`, `provider_5xx`.
+
+### Escenarios de resultado asíncrono (`201 PENDING` → webhook)
 
 | Header Value | Descripción | Webhook Status |
 |---|---|---|
-| `error:insufficient-funds` | Cuenta sin saldo suficiente | `FAILED` |
-| `error:invalid-clabe` | CLABE de destino malformada o inexistente | `FAILED` |
-| `error:account-not-found` | Cuenta destino no localizada en la red SPEI | `FAILED` |
-| `error:account-blocked` | Cuenta destino bloqueada o cerrada | `FAILED` |
-| `error:duplicate-external-id` | `externalId` ya usado en otra transacción | `FAILED` |
-| `error:bank-rejected` | Banco destino rechazó la transferencia (genérico) | `FAILED` |
+| `success` _(o sin header)_ | Comportamiento default del sandbox | `CONFIRMED` |
+| `pending_long` | Confirma tras ~30s (settlement lento) | `CONFIRMED` |
+| `rejected` | El proveedor / red SPEI rechazó | `FAILED` |
+| `returned` | Aceptada y luego devuelta por el banco contraparte | `RETURNED` |
+| `insufficient_funds` | Cuenta sin saldo suficiente (**solo cash-out**) | `FAILED` (`errorCode: INSUFFICIENT_FUNDS`) |
+| `bad_clabe` | CLABE inválida (**solo cash-out**) | `RETURNED` (`errorCode: INVALID_CLABE`) |
 
-### Success Scenario
+### Escenarios de error síncrono (sin webhook)
 
-| Header Value | Descripción | Webhook Status |
+| Header Value | Descripción | HTTP Response |
 |---|---|---|
-| `success` | Fuerza éxito (mismo comportamiento del default) | `CONFIRMED` |
-| _(sin header)_ | Comportamiento default del sandbox | `CONFIRMED` |
-
-### Delay Scenarios
-
-| Header Value | Descripción | Webhook Status |
-|---|---|---|
-| `delayed:5s` | Éxito tras 5 segundos extra | `CONFIRMED` |
-| `delayed:30s` | Éxito tras 30 segundos extra | `CONFIRMED` |
-| `delayed:60s` | Éxito tras 60 segundos extra | `CONFIRMED` |
+| `timeout` | Timeout upstream tras ~16s | `504` |
+| `provider_5xx` | Proveedor no disponible | `503` |
 
 <Info>
-  El delay máximo permitido es de **120 segundos** — valores arriba se truncan automáticamente.
+  `insufficient_funds` y `bad_clabe` **no aplican a cash-in** — enviarlos en un cash-in devuelve `400` con código `SCENARIO_NOT_APPLICABLE`.
 </Info>
 
 ## Received Webhook Examples
@@ -182,7 +174,7 @@ response = requests.post(
 }
 ```
 
-### Error Webhook (`error:insufficient-funds`)
+### Error Webhook (`insufficient_funds`)
 
 ```json
 {
@@ -234,7 +226,7 @@ Notas:
 - Tu sistema recibe el webhook con `status` correspondiente al scenario (`CONFIRMED` o `FAILED`).
 
 <Warning>
-  El header controla **solo el webhook**. La respuesta HTTP siempre es `201 Created` con `status: PENDING`, sin importar el scenario.
+  En la mayoría de los escenarios el header controla **solo el webhook**, y la respuesta HTTP es `201 Created` con `status: PENDING`. Las excepciones `timeout` (`504`) y `provider_5xx` (`503`) fallan en la propia respuesta síncrona.
 </Warning>
 
 ## Restrictions
