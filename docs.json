@@ -46,8 +46,7 @@
                   "es/guides/authentication",
                   "es/guides/balance",
                   "es/guides/spei-cash-in",
-                  "es/guides/spei-cash-out",
-                  "es/guides/postman-collections"
+                  "es/guides/spei-cash-out"
                 ]
               },
               {
@@ -109,8 +108,7 @@
                   "en/guides/authentication",
                   "en/guides/balance",
                   "en/guides/spei-cash-in",
-                  "en/guides/spei-cash-out",
-                  "en/guides/postman-collections"
+                  "en/guides/spei-cash-out"
                 ]
               },
               {
@@ -173,8 +171,7 @@
                   "pt-br/guides/authentication",
                   "pt-br/guides/balance",
                   "pt-br/guides/spei-cash-in",
-                  "pt-br/guides/spei-cash-out",
-                  "pt-br/guides/postman-collections"
+                  "pt-br/guides/spei-cash-out"
                 ]
               },
               {
