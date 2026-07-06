@@ -1,79 +1,68 @@
 ---
-title: 'cash_out event'
-description: 'Notification sent when a SPEI cash-out is settled or fails'
+title: 'cash_out Webhook'
+description: 'Lifecycle notifications for a SPEI cash-out'
+mode: 'wide'
 ---
 
 ## When it fires
 
-The `cash_out` event fires in two scenarios:
+The `cash_out` webhook type receives the lifecycle events of a transfer created via `POST /api/spei/cash-out`:
 
-- **Success** — the SPEI cash-out sent via `POST /api/spei/cash-out` was settled at Banxico (`status: CONFIRMED`)
-- **Failure** — the SPEI network rejected the transfer (`status: FAILED`)
+| `event` | `status` | Meaning |
+|---|---|---|
+| `transaction.cash_out.settled` | `LIQUIDATED` | The transfer was settled on the SPEI network |
+| `transaction.cash_out.rejected` | `REJECTED` | The SPEI network rejected the transfer — the debited balance is returned |
+| `transaction.cash_out.pending` | `PENDING` | Intermediate processing update |
 
-## Payload (confirmed)
+<Info>
+  The **return** of an already settled cash-out (`transaction.cash_out.returned`) — when the counterparty's bank returns the transfer — is delivered on the [`refund_out`](/en/guides/webhooks/refund-out) webhook type, not on `cash_out`.
+</Info>
 
-```json
-{
-  "event": "cash_out",
-  "deliveryId": "1a3f9e8d-2c47-4b9c-aa18-77a2b3c4d5e6",
-  "createdAt": "2026-05-13T12:00:42.000Z",
-  "transaction": {
-    "id": 56789,
-    "externalId": "payout-001",
-    "paymentMethod": "SPEI",
-    "direction": "out",
-    "type": "cash_out",
-    "status": "CONFIRMED",
-    "amountCentavos": 50000,
-    "clabe": "012180001234567890",
-    "createdAt": "2026-05-13T12:00:00.000Z",
-    "confirmedAt": "2026-05-13T12:00:42.000Z"
-  }
-}
-```
-
-## Payload (failure)
+## Payload
 
 ```json
 {
-  "event": "cash_out",
-  "deliveryId": "...",
-  "createdAt": "2026-05-13T12:01:00.000Z",
-  "transaction": {
-    "id": 56789,
-    "status": "FAILED",
-    "paymentMethod": "SPEI",
-    "direction": "out",
-    "type": "cash_out",
-    "amountCentavos": 50000,
-    "clabe": "012180001234567890",
-    "createdAt": "2026-05-13T12:00:00.000Z",
-    "confirmedAt": null
-  }
+  "event": "transaction.cash_out.settled",
+  "transactionId": "1a3f9e8d-2c47-4b9c-aa18-77a2b3c4d5e6",
+  "amount": 50000,
+  "currency": "MXN",
+  "status": "LIQUIDATED",
+  "destinationClabe": "012180001234567890",
+  "sourceClabe": null,
+  "reference": "9876543",
+  "voucher": "CEP20260513D4E5F6",
+  "occurredAt": "2026-05-13T12:00:42.000Z"
 }
 ```
 
-When `status: FAILED`, the blocked balance is automatically released.
+On `status: REJECTED`, the receipt fields (`reference`, `voucher`) may be `null` — the SPEI network never confirmed the transaction.
 
 ## Headers
 
 | Header | Value |
 |---|---|
-| `X-NTXPay-Event` | `cash_out` |
-| `X-NTXPay-Signature` | `sha256=<hmac>` |
-| `X-NTXPay-Timestamp` | Unix epoch |
-| `X-NTXPay-Delivery` | UUID |
+| `x-event-id` | Unique event UUID (use for dedupe) |
+| `X-NTXPay-Signature` | `sha256=<hmac>` of the raw body |
 
 ## Behavior
 
-- **At-least-once**: you may receive `CONFIRMED` more than once. Deduplicate by `transaction.id`.
-- **Failure after success**: doesn't happen. A transaction won't move from `CONFIRMED` to `FAILED`.
-- **Reversal**: if the counterparty (beneficiary) returns, you receive a separate `refund_in` event, with `transaction.type = "refund_in"` linked by the `externalId`.
+- **At-least-once**: you may receive the same event more than once. Deduplicate by `x-event-id`.
+- **Failure after success**: does not happen. A transaction never moves from `LIQUIDATED` to `REJECTED`.
+- **Return**: if the counterparty returns the transfer after settlement, you receive `transaction.cash_out.returned` on the `refund_out` webhook, with the same `transactionId`.
 
 ## Expected Response
 
-```http
-HTTP/1.1 200 OK
+`200 OK` within 10 seconds.
+
+## Processing
+
+```typescript
+const event = JSON.parse(rawBody.toString());
+if (event.event === 'transaction.cash_out.settled') {
+  await markPayoutSettled(event.transactionId);
+} else if (event.event === 'transaction.cash_out.rejected') {
+  await markPayoutFailed(event.transactionId); // balance returned automatically
+}
 ```
 
-See the [implementation guide](/en/guides/webhooks/implementation) for HMAC validation.
+For the complete handler with HMAC validation and dedupe in Node.js, Python, Java, and Go, see [Implementation](/en/guides/webhooks/implementation).

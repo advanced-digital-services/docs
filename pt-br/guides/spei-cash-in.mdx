@@ -5,7 +5,7 @@ description: 'Receba pagamentos SPEI via CLABE descartável de uso único'
 
 ## Visão Geral
 
-O **cash-in SPEI** gera uma **CLABE descartável** que o pagador usa para fazer uma transferência SPEI pelo app do banco. Quando a NTX Pay recebe a liquidação, a transação passa para `CONFIRMED` e dispara o webhook `cash_in`.
+O **cash-in SPEI** gera uma **CLABE descartável** que o pagador usa para fazer uma transferência SPEI pelo app do banco. Quando a NTX Pay recebe a liquidação, você é notificado no webhook `cash_in` com o evento `transaction.cash_in.settled`.
 
 Características:
 
@@ -58,6 +58,8 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
 }
 ```
 
+Exiba a `destinationClabe` (e/ou a `checkoutUrl`) ao pagador final.
+
 ## Campos do Request
 
 <ParamField path="amountCentavos" type="integer" required>
@@ -98,7 +100,7 @@ sequenceDiagram
     App->>Payer: Exibe CLABE (e/ou checkoutUrl)
     Payer->>Bank: Transferência SPEI para destinationClabe
     Bank-->>NTX: Liquidação SPEI
-    NTX->>App: webhook cash_in (CONFIRMED)
+    NTX->>App: webhook cash_in (transaction.cash_in.settled)
 ```
 
 ## Estados da Transação
@@ -110,15 +112,30 @@ sequenceDiagram
 | `FAILED` | Erro de processamento |
 | `EXPIRED` | CLABE expirou sem receber transferência |
 
+No webhook, a liquidação chega como `transaction.cash_in.settled` com `status: LIQUIDATED` — veja o [payload completo](/pt-br/guides/webhooks/cash-in).
+
 ## Idempotência
 
 Reenvie a mesma requisição com o mesmo `externalId` para garantir que uma falha de rede não gere duas cobranças. Em caso de duplicação, a NTX Pay retorna a cobrança existente.
+
+## Testar no Sandbox
+
+No sandbox, a liquidação é simulada em segundos — sem depender de um banco emissor. Controle o desfecho com o header `X-Sandbox-Scenario`:
+
+```bash
+curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Sandbox-Scenario: rejected" \
+  ...
+```
+
+Veja o [catálogo de cenários](/pt-br/sandbox/scenarios) para forçar rejeição, devolução e atraso.
 
 ## Próximos Passos
 
 <CardGroup cols={2}>
   <Card title="Webhook cash_in" href="/pt-br/guides/webhooks/cash-in">
-    Detalhes do payload do webhook de confirmação
+    Payload do webhook de confirmação
   </Card>
   <Card title="SPEI Cash-Out" href="/pt-br/guides/spei-cash-out">
     Envie transferências SPEI

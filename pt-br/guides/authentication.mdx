@@ -13,6 +13,10 @@ A API NTX Pay México usa autenticação em duas camadas:
 
 A combinação retorna um **JWT** (validade 10 minutos) usado nos demais endpoints como `Authorization: Bearer ...`.
 
+<Info>
+  A autenticação no **sandbox é idêntica** — o que muda é o par certificado + `clientId`/`clientSecret`, que é distinto do de produção. Credenciais de produção contra `https://sandbox.mx.ntxpay.com` retornam `401`.
+</Info>
+
 ## Endpoint
 
 ### POST /api/auth/token
@@ -64,7 +68,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/auth/token \
 Inclua o `access_token` em todas as requisições autenticadas:
 
 ```bash
-curl -X GET https://sandbox.mx.ntxpay.com/api/spei/transaction/order-abc-123 \
+curl -X GET https://sandbox.mx.ntxpay.com/api/balance \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -240,10 +244,10 @@ func getToken() (string, error) {
 ## Próximos Passos
 
 <CardGroup cols={2}>
-  <Card title="Cenários de Sandbox" href="/pt-br/sandbox/scenarios">
-    Use o header `X-Sandbox-Scenario` para simular sucesso, falha e atraso nos webhooks
+  <Card title="Consulta de Saldo" href="/pt-br/guides/balance">
+    Aplique o token Bearer e consulte o saldo da conta
   </Card>
-  <Card title="Criar Cobrança SPEI" href="/pt-br/endpoints/spei-cash-in">
-    Aplique o token Bearer e faça sua primeira cobrança SPEI Cash-In
+  <Card title="SPEI Cash-In" href="/pt-br/guides/spei-cash-in">
+    Faça sua primeira cobrança SPEI
   </Card>
 </CardGroup>

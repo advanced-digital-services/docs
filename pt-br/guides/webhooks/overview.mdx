@@ -6,61 +6,101 @@ mode: 'wide'
 
 ## O que são Webhooks
 
-Webhooks permitem que o NTX Pay envie notificações HTTPS para o seu servidor sempre que um evento relevante ocorre — confirmação de cash-in, falha de cash-out, etc. — sem você precisar fazer polling em `GET /api/spei/transaction/{externalId}`.
+Webhooks permitem que o NTX Pay envie notificações HTTPS para o seu servidor sempre que um evento relevante ocorre — confirmação de cash-in, falha de cash-out, devolução — sem você precisar fazer polling.
 
-## Eventos Disponíveis (verificar se tem mais eventos a serem adicionados)
+## Tipos de Webhook
 
-| Evento | Quando dispara |
+Ao registrar um webhook via `POST /api/webhooks-config`, você escolhe **qual tipo de evento** aquela URL recebe:
+
+| Tipo | Recebe |
 |---|---|
-| `cash_in` | SPEI cash-in confirmado |
-| `cash_out` | SPEI cash-out liquidado |
-| `refund_in` | Estorno **recebido** (uma transação cash-out sua foi devolvida) |
-| `refund_out` | Estorno **enviado** (você devolveu um cash-in) |
-| `internal_transfer` | Transferência interna entre contas NTX Pay |
+| `cash_in` | Resultado de cobranças SPEI (confirmada, rejeitada, pendente) |
+| `cash_out` | Resultado de envios SPEI (liquidado, rejeitado, pendente) |
+| `refund_in` | Devolução de um **cash-in** — um pagamento que você recebeu foi estornado ao pagador |
+| `refund_out` | Devolução de um **cash-out** — uma transferência que você enviou foi devolvida pela contraparte |
+| `all` | **Geral** — uma única URL que recebe todos os eventos acima |
 
-## Configuração
+<Info>
+  Cada webhook assina **exatamente um** tipo. Para receber vários tipos em URLs separadas, crie um webhook por tipo — ou use `all` para centralizar tudo em uma URL e rotear pelo campo `event` do payload.
+</Info>
 
-Endpoint: `POST /api/webhooks-config`. Você fornece:
+## Payload
 
-- **`url`** — endpoint HTTPS no seu servidor
-- **`events`** — array com exatamente 1 evento (um webhook assina um evento)
-- **`secret`** — opcional. Se omitido, o NTX Pay gera um automaticamente e retorna na resposta.
+Todo webhook entrega o mesmo formato de payload:
 
-Veja o [guia de Setup](/pt-br/guides/webhooks/setup) para o passo a passo.
+```json
+{
+  "event": "transaction.cash_in.settled",
+  "transactionId": "8e2c5b6f-3a12-4b9c-9a18-77a2b3c4d5e6",
+  "amount": 50000,
+  "currency": "MXN",
+  "status": "LIQUIDATED",
+  "destinationClabe": "012180001234567890",
+  "sourceClabe": "646180123456789012",
+  "reference": "1234567",
+  "voucher": "CEP20260512A1B2C3",
+  "occurredAt": "2026-05-12T14:31:05.000Z"
+}
+```
 
-## Segurança — Assinatura HMAC
+<ResponseField name="event" type="string">
+  Tipo do evento: `transaction.cash_in.settled`, `transaction.cash_in.rejected`, `transaction.cash_in.returned`, `transaction.cash_out.settled`, `transaction.cash_out.rejected`, `transaction.cash_out.returned`, ou as variantes `.pending`. Use este campo para rotear o processamento.
+</ResponseField>
 
-Todo webhook é assinado com HMAC-SHA256 usando o `secret`. Headers enviados:
+<ResponseField name="transactionId" type="string">
+  Identificador da transação. Correlacione com o `id` retornado na criação da cobrança/transferência.
+</ResponseField>
+
+<ResponseField name="amount" type="integer">
+  Valor em centavos MXN.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  `LIQUIDATED` (liquidado), `REJECTED` (rejeitado), `RETURNED` (devolvido) ou `PENDING` (em processamento).
+</ResponseField>
+
+<ResponseField name="destinationClabe / sourceClabe" type="string">
+  CLABEs de destino e origem da transferência. Podem vir `null` dependendo do fluxo.
+</ResponseField>
+
+<ResponseField name="reference / voucher" type="string">
+  Referência numérica SPEI e comprovante, quando disponíveis.
+</ResponseField>
+
+<ResponseField name="occurredAt" type="string">
+  Timestamp ISO 8601 do evento.
+</ResponseField>
+
+## Headers
 
 | Header | Conteúdo |
 |---|---|
-| `X-NTXPay-Signature` | `sha256=<hex-hmac>` do corpo bruto |
-| `X-NTXPay-Timestamp` | timestamp Unix do envio |
-| `X-NTXPay-Event` | nome do evento (`cash_in`, etc.) |
-| `X-NTXPay-Delivery` | UUID único do envio (use para dedupe) |
+| `x-event-id` | UUID único do evento — use para **deduplicar** |
+| `X-NTXPay-Signature` | `sha256=<hex-hmac>` do corpo bruto, assinado com o `secret` do webhook |
+| `Content-Type` | `application/json` |
 
-**Sempre valide a assinatura** antes de processar — sem isso, qualquer pessoa pode falsificar notificações.
+**Sempre valide a assinatura** antes de processar — sem isso, qualquer pessoa pode falsificar notificações. Veja [Implementação](/pt-br/guides/webhooks/implementation).
 
 ## Garantias de Entrega
 
-- **At-least-once**: você pode receber o mesmo evento mais de uma vez. Use `X-NTXPay-Delivery` para deduplicar.
-- **Retries**: até 5 tentativas em backoff exponencial se você responder com status diferente de `2xx`.
-- **Timeout**: 10 segundos. Responda rápido — processe assincronamente se necessário.
-- **Order**: os eventos chegam **fora de ordem** em condições de erro. Confira `createdAt` no payload.
+- **At-least-once**: você pode receber o mesmo evento mais de uma vez. Deduplique por `x-event-id`.
+- **Retries**: até **5 tentativas** em backoff exponencial (a partir de ~5s) se você responder com status diferente de `2xx`.
+- **Timeout**: **10 segundos**. Responda rápido — processe assincronamente se necessário.
+- **Ordem**: eventos podem chegar fora de ordem em condições de erro. Confira `occurredAt` no payload.
 
 ## Práticas Recomendadas
 
 1. **Responda `200` imediatamente** após validar a assinatura e enfileirar o evento.
-2. **Deduplique por `X-NTXPay-Delivery`** ou `transaction.id`.
-3. **Idempotência**: processe `cash_in` confirmado para o mesmo `externalId` uma única vez.
-4. **Re-consulte** `GET /api/spei/transaction/{externalId}` se tiver dúvida sobre estado — webhook é uma otimização, não a fonte da verdade.
+2. **Deduplique por `x-event-id`**.
+3. **Roteie pelo campo `event`** — não presuma que uma URL recebe um único tipo (especialmente com `all`).
+4. **Trate `status` explicitamente** — implemente os quatro estados (`LIQUIDATED`, `REJECTED`, `RETURNED`, `PENDING`).
 5. **HTTPS obrigatório** — webhooks só são enviados a URLs com protocolo HTTPS.
 
 ## Próximos Passos
 
 <CardGroup cols={2}>
-  <Card title="Setup de Webhook" href="/pt-br/guides/webhooks/setup">
-    Configure o endpoint na sua conta
+  <Card title="Configuração" href="/pt-br/guides/webhooks/setup">
+    Registre a URL na sua conta e dispare um webhook de teste
   </Card>
   <Card title="Implementação" href="/pt-br/guides/webhooks/implementation">
     Exemplos em Node.js, Python, Java e Go de validação HMAC

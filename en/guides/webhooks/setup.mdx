@@ -1,15 +1,17 @@
 ---
 title: 'Webhook Setup'
-description: 'Configure webhook URLs programmatically for SPEI'
+description: 'Register, test, list, and delete webhook URLs programmatically'
+mode: 'wide'
 ---
 
 ## Overview
 
-Webhook configuration goes through three endpoints:
+Webhook configuration is done via four endpoints:
 
 - `GET /api/webhooks-config` — list active webhooks
 - `POST /api/webhooks-config` — create/configure a webhook
-- `DELETE /api/webhooks-config/{id}` — remove a webhook
+- `POST /api/webhooks-config/test` — trigger a signed test webhook
+- `DELETE /api/webhooks-config/{id}` — delete a webhook
 
 ## Create Webhook
 
@@ -20,7 +22,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "url": "https://my-server.com/webhooks/ntxpay",
+    "url": "https://meu-servidor.com/webhooks/ntxpay",
     "events": ["cash_in"],
     "secret": "whsec_abc123def456"
   }'
@@ -31,7 +33,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
 ```json
 {
   "id": 42,
-  "url": "https://my-server.com/webhooks/ntxpay",
+  "url": "https://meu-servidor.com/webhooks/ntxpay",
   "events": ["cash_in"],
   "isActive": true,
   "secret": "whsec_abc123def456"
@@ -39,22 +41,66 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
 ```
 
 <Warning>
-  If you omit `secret` in the request, NTX Pay generates one automatically and returns it in the response — **store it immediately**, it won't be shown again.
+  If you omit `secret` in the request, NTX Pay generates one automatically and returns it in the response — **store it immediately**, it is never shown again.
 </Warning>
 
 ### Fields
 
 <ParamField path="url" type="string" required>
-  HTTPS endpoint URL to receive webhooks. **Plain HTTP is rejected.**
+  HTTPS URL of the endpoint that will receive the webhooks. **Plain HTTP is rejected.**
 </ParamField>
 
 <ParamField path="events" type="array" required>
-  A webhook subscribes to **exactly ONE** event — the array must contain a single item. Accepted values: `cash_in`, `cash_out`, `refund_in`, `refund_out`, `internal_transfer`. To receive more than one event type, create one webhook per event.
+  A webhook subscribes to **exactly ONE** event — the array must contain a single item. Accepted values: `cash_in`, `cash_out`, `refund_in`, `refund_out`, `all` (General — receives all events), and `internal_transfer`. See the semantics of each type in the [Overview](/en/guides/webhooks/overview).
 </ParamField>
 
 <ParamField path="secret" type="string">
-  HMAC secret to validate signature. Minimum 8 characters, maximum 128. If omitted, NTX Pay generates one.
+  HMAC secret for signature validation. Minimum 8 characters, maximum 128. If omitted, NTX Pay generates one.
 </ParamField>
+
+## Test Webhook
+
+After creating the webhook, trigger a test delivery **signed with the same secret** — no need to move a transaction:
+
+```bash
+curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config/test \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "eventType": "cash_in",
+    "status": "LIQUIDATED"
+  }'
+```
+
+```json
+{
+  "delivered": true,
+  "url": "https://meu-servidor.com/webhooks/ntxpay",
+  "eventId": "8e2c5b6f-3a12-4b9c-9a18-77a2b3c4d5e6",
+  "status": "LIQUIDATED",
+  "signed": true,
+  "statusCode": 200,
+  "timeMs": 184
+}
+```
+
+<ParamField path="eventType" type="string" required>
+  Which webhook receives the test: `cash_in`, `cash_out`, `refund_in`, `refund_out`, or `internal_transfer`.
+</ParamField>
+
+<ParamField path="status" type="string">
+  Simulated status in the payload: `LIQUIDATED` (default), `PENDING`, `REJECTED`, or `RETURNED`.
+</ParamField>
+
+<ParamField path="overrideUrl" type="string">
+  Temporary test URL (e.g. webhook.site). If omitted, delivers to the configured URL.
+</ParamField>
+
+<ParamField path="amountCentavos" type="integer">
+  Amount in centavos in the test payload (default `1000` = $10.00 MXN).
+</ParamField>
+
+`delivered: true` means your endpoint responded `2xx`. `statusCode: 0` indicates a connection error.
 
 ## List Webhooks
 
@@ -69,7 +115,7 @@ curl -X GET https://sandbox.mx.ntxpay.com/api/webhooks-config \
   "webhooks": [
     {
       "id": 42,
-      "url": "https://my-server.com/webhooks/ntxpay",
+      "url": "https://meu-servidor.com/webhooks/ntxpay",
       "events": ["cash_in"],
       "isActive": true,
       "createdAt": "2026-05-01T10:30:00.000Z"
@@ -80,10 +126,10 @@ curl -X GET https://sandbox.mx.ntxpay.com/api/webhooks-config \
 ```
 
 <Info>
-  The list response does **not** include the `secret` — it's only shown on creation.
+  The list response does **not** include the `secret` — it is only shown at creation time.
 </Info>
 
-## Remove Webhook
+## Delete Webhook
 
 ```bash
 curl -X DELETE https://sandbox.mx.ntxpay.com/api/webhooks-config/42 \
@@ -93,36 +139,35 @@ curl -X DELETE https://sandbox.mx.ntxpay.com/api/webhooks-config/42 \
 ```json
 {
   "success": true,
-  "message": "Webhook removed successfully"
+  "message": "Webhook removido com sucesso"
 }
 ```
 
 ## Multiple Webhooks
 
-Each webhook subscribes to exactly one event, so configure **one webhook per event type** you want to receive (e.g. one for `cash_in`, another for `cash_out`). Useful for:
+Each webhook subscribes to exactly one event, so you have two strategies:
 
-- Routing each event type to its own endpoint/handler
-- Internal **homologation** vs production environment
-- Multiple services consuming different events
+- **One webhook per type** (e.g. one for `cash_in`, another for `cash_out`) — routes each type to its own endpoint/handler.
+- **One `all` webhook** — a single URL receives everything and your handler routes by the payload's `event` field.
 
-## Testing the Endpoint
+## Validating the Endpoint
 
-Before configuring in production, validate your endpoint:
+Before releasing the webhook to receive real traffic:
 
-1. Configure in sandbox first
-2. Use [webhook.site](https://webhook.site) or [ngrok](https://ngrok.com) to inspect the traffic
-3. Verify your application:
+1. Use [webhook.site](https://webhook.site) or [ngrok](https://ngrok.com) to inspect the traffic (the test webhook's `overrideUrl` field accepts these URLs)
+2. Trigger deliveries with `POST /api/webhooks-config/test`, varying the `status`
+3. Verify that your application:
    - Validates `X-NTXPay-Signature` correctly
    - Returns `200` in under 10 seconds
-   - Deduplicates by `X-NTXPay-Delivery`
+   - Deduplicates by `x-event-id`
 
 ## Next Steps
 
 <CardGroup cols={2}>
   <Card title="Implementation" href="/en/guides/webhooks/implementation">
-    HMAC validation in Node, Python and PHP
+    HMAC validation in Node.js, Python, Java, and Go
   </Card>
   <Card title="Events" href="/en/guides/webhooks/cash-in">
-    Payload of each event type
+    Payload for each event type
   </Card>
 </CardGroup>

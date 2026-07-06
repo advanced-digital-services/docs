@@ -1,58 +1,56 @@
 ---
-title: 'Evento refund_in'
-description: 'Notificación de estorno recibido — una transferencia cash-out tuya fue devuelta'
+title: 'Webhook refund_in'
+description: 'Devolución de un cash-in — un pago recibido fue devuelto al pagador'
+mode: 'wide'
 ---
 
-## Cuándo dispara
+## Cuándo se dispara
 
-El evento `refund_in` se dispara cuando una transacción **cash-out enviada por ti** es devuelta por la contraparte. El saldo correspondiente se acredita de vuelta en tu cuenta.
+El webhook del tipo `refund_in` recibe el evento `transaction.cash_in.returned`: un **cash-in que recibiste fue devuelto al pagador**. El saldo correspondiente se debita de tu cuenta.
 
 Escenarios comunes:
 
-- Beneficiario rechazó la transferencia manualmente
-- CLABE existía pero la cuenta fue cerrada tras la confirmación inicial
-- Estorno solicitado por el beneficiario dentro del plazo SPEI
+- Reverso por motivo de fraude o error
+- Devolución dentro del plazo de la red SPEI
 
 ## Payload
 
 ```json
 {
-  "event": "refund_in",
-  "deliveryId": "5b9c2d8e-4f12-4a18-bb29-88a3b4c5d6f7",
-  "createdAt": "2026-05-14T09:15:00.000Z",
-  "transaction": {
-    "id": 67890,
-    "externalId": "payout-001-refund",
-    "paymentMethod": "SPEI",
-    "direction": "in",
-    "type": "refund_in",
-    "status": "CONFIRMED",
-    "amountCentavos": 50000,
-    "clabe": "012180001234567890",
-    "createdAt": "2026-05-14T09:14:50.000Z",
-    "confirmedAt": "2026-05-14T09:15:00.000Z"
-  },
-  "originalTransactionId": 56789
+  "event": "transaction.cash_in.returned",
+  "transactionId": "8e2c5b6f-3a12-4b9c-9a18-77a2b3c4d5e6",
+  "amount": 50000,
+  "currency": "MXN",
+  "status": "RETURNED",
+  "destinationClabe": "012180001234567890",
+  "sourceClabe": "646180123456789012",
+  "reference": "1234567",
+  "voucher": null,
+  "occurredAt": "2026-05-14T11:45:00.000Z"
 }
 ```
 
-El campo `originalTransactionId` apunta al `id` del cash-out original que fue estornado. Úsalo para correlacionar.
+El `transactionId` es el **mismo** del cash-in original — úsalo para localizar la orden y marcarla como devuelta.
+
+## Headers
+
+| Header | Valor |
+|---|---|
+| `x-event-id` | UUID único del evento (úsalo para dedupe) |
+| `X-NTXPay-Signature` | `sha256=<hmac>` del cuerpo crudo |
 
 ## Respuesta Esperada
 
-`HTTP 200 OK` en hasta 10 segundos.
+`200 OK` en un máximo de 10 segundos.
 
-## Procesamiento Recomendado
+## Procesamiento
 
 ```typescript
-if (event.event === 'refund_in') {
-  // Crédito del saldo ya ocurrió automáticamente
-  await marcarPayoutComoEstornado({
-    originalId: event.originalTransactionId,
-    refundId: event.transaction.id,
-    valor: event.transaction.amountCentavos,
-  });
+const event = JSON.parse(rawBody.toString());
+if (event.event === 'transaction.cash_in.returned') {
+  // El débito del saldo ya ocurrió automáticamente
+  await markOrderRefunded(event.transactionId, event.amount);
 }
 ```
 
-Ver el [guía de implementación](/es/guides/webhooks/implementation) para validación HMAC.
+Para el handler completo con validación HMAC y dedupe en Node.js, Python, Java y Go, consulta [Implementación](/es/guides/webhooks/implementation).

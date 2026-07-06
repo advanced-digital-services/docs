@@ -1,17 +1,17 @@
 ---
 title: 'SPEI Cash-In'
-description: 'Receive SPEI payments via one-time disposable CLABE'
+description: 'Receive SPEI payments via a single-use disposable CLABE'
 ---
 
 ## Overview
 
-**SPEI cash-in** generates a **disposable CLABE** that the payer uses to make a SPEI transfer from their banking app. When NTX Pay receives the settlement, the transaction moves to `CONFIRMED` and triggers the `cash_in` webhook.
+**SPEI cash-in** generates a **disposable CLABE** that the payer uses to make a SPEI transfer from their banking app. When NTX Pay receives the settlement, you are notified on the `cash_in` webhook with the `transaction.cash_in.settled` event.
 
 Characteristics:
 
 - CLABE valid for a **single** transfer (one-time use)
 - **Asynchronous** confirmation (seconds to minutes)
-- Expires on configurable date (default ~24 hours)
+- Expires at a configurable date (default ~24 hours)
 
 ## Endpoint
 
@@ -58,14 +58,16 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
 }
 ```
 
+Display the `destinationClabe` (and/or the `checkoutUrl`) to the end payer.
+
 ## Request Fields
 
 <ParamField path="amountCentavos" type="integer" required>
-  Value in MXN centavos (minimum 1). Ex.: `50000` = $500.00 MXN.
+  Amount in MXN centavos (minimum 1). E.g. `50000` = $500.00 MXN.
 </ParamField>
 
 <ParamField path="externalId" type="string">
-  Unique external identifier (up to 100 characters). Use to correlate with your system. Recommended for idempotency.
+  Unique external identifier (up to 100 characters). Use it to correlate with your system. Recommended for idempotency.
 </ParamField>
 
 <ParamField path="description" type="string">
@@ -73,7 +75,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
 </ParamField>
 
 <ParamField path="customerName" type="string" required>
-  Payer name (1–255 characters), shown on the SPEI checkout.
+  Payer name (1–255 characters), displayed on the SPEI checkout.
 </ParamField>
 
 <ParamField path="customerEmail" type="string" required>
@@ -90,35 +92,50 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
 sequenceDiagram
     participant App as Your application
     participant NTX as NTX Pay
-    participant Payer
+    participant Payer as Payer
     participant Bank as Payer's bank
 
     App->>NTX: POST /api/spei/cash-in
     NTX-->>App: 201 + destinationClabe
-    App->>Payer: Show CLABE (and/or checkoutUrl)
+    App->>Payer: Display CLABE (and/or checkoutUrl)
     Payer->>Bank: SPEI transfer to destinationClabe
     Bank-->>NTX: SPEI settlement
-    NTX->>App: webhook cash_in (CONFIRMED)
+    NTX->>App: cash_in webhook (transaction.cash_in.settled)
 ```
 
 ## Transaction States
 
 | Status | Meaning |
 |---|---|
-| `PENDING` | CLABE issued, waiting for transfer |
+| `PENDING` | CLABE issued, waiting for the transfer |
 | `CONFIRMED` | Transfer received and settled |
 | `FAILED` | Processing error |
-| `EXPIRED` | CLABE expired without receiving transfer |
+| `EXPIRED` | CLABE expired without receiving a transfer |
+
+On the webhook, the settlement arrives as `transaction.cash_in.settled` with `status: LIQUIDATED` — see the [full payload](/en/guides/webhooks/cash-in).
 
 ## Idempotency
 
-Resend the same request with the same `externalId` to ensure that a network failure doesn't generate two charges. In case of duplication, NTX Pay returns the existing charge.
+Resend the same request with the same `externalId` to guarantee a network failure does not create two charges. On duplication, NTX Pay returns the existing charge.
+
+## Testing in the Sandbox
+
+In the sandbox, settlement is simulated within seconds — no issuing bank required. Control the outcome with the `X-Sandbox-Scenario` header:
+
+```bash
+curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Sandbox-Scenario: rejected" \
+  ...
+```
+
+See the [scenario catalog](/en/sandbox/scenarios) to force rejection, return, and delay.
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="cash_in webhook" href="/en/guides/webhooks/cash-in">
-    Details of the confirmation webhook payload
+  <Card title="cash_in Webhook" href="/en/guides/webhooks/cash-in">
+    Confirmation webhook payload
   </Card>
   <Card title="SPEI Cash-Out" href="/en/guides/spei-cash-out">
     Send SPEI transfers

@@ -1,258 +1,68 @@
 ---
-title: 'Evento cash_out'
-description: 'Notificação enviada quando um SPEI cash-out é liquidado ou falha'
+title: 'Webhook cash_out'
+description: 'Notificações do ciclo de vida de um SPEI cash-out'
 mode: 'wide'
 ---
 
 ## Quando dispara
 
-O evento `cash_out` é disparado em dois cenários:
+O webhook do tipo `cash_out` recebe os eventos do ciclo de vida de uma transferência criada via `POST /api/spei/cash-out`:
 
-- **Sucesso** — o SPEI cash-out enviado via `POST /api/spei/cash-out` foi liquidado no Banxico (`status: CONFIRMED`)
-- **Falha** — a rede SPEI rejeitou a transferência (`status: FAILED`)
+| `event` | `status` | Significado |
+|---|---|---|
+| `transaction.cash_out.settled` | `LIQUIDATED` | A transferência foi liquidada na rede SPEI |
+| `transaction.cash_out.rejected` | `REJECTED` | A rede SPEI rejeitou a transferência — o saldo debitado é devolvido |
+| `transaction.cash_out.pending` | `PENDING` | Atualização intermediária de processamento |
 
-## Payload (confirmado)
+<Info>
+  A **devolução** de um cash-out já liquidado (`transaction.cash_out.returned`) — quando o banco da contraparte devolve a transferência — é entregue no webhook do tipo [`refund_out`](/pt-br/guides/webhooks/refund-out), não no `cash_out`.
+</Info>
 
-```json
-{
-  "event": "cash_out",
-  "deliveryId": "1a3f9e8d-2c47-4b9c-aa18-77a2b3c4d5e6",
-  "createdAt": "2026-05-13T12:00:42.000Z",
-  "transaction": {
-    "id": 56789,
-    "externalId": "payout-001",
-    "paymentMethod": "SPEI",
-    "direction": "out",
-    "type": "cash_out",
-    "status": "CONFIRMED",
-    "amountCentavos": 50000,
-    "clabe": "012180001234567890",
-    "createdAt": "2026-05-13T12:00:00.000Z",
-    "confirmedAt": "2026-05-13T12:00:42.000Z"
-  }
-}
-```
-
-## Payload (falha)
+## Payload
 
 ```json
 {
-  "event": "cash_out",
-  "deliveryId": "...",
-  "createdAt": "2026-05-13T12:01:00.000Z",
-  "transaction": {
-    "id": 56789,
-    "status": "FAILED",
-    "paymentMethod": "SPEI",
-    "direction": "out",
-    "type": "cash_out",
-    "amountCentavos": 50000,
-    "clabe": "012180001234567890",
-    "createdAt": "2026-05-13T12:00:00.000Z",
-    "confirmedAt": null
-  }
+  "event": "transaction.cash_out.settled",
+  "transactionId": "1a3f9e8d-2c47-4b9c-aa18-77a2b3c4d5e6",
+  "amount": 50000,
+  "currency": "MXN",
+  "status": "LIQUIDATED",
+  "destinationClabe": "012180001234567890",
+  "sourceClabe": null,
+  "reference": "9876543",
+  "voucher": "CEP20260513D4E5F6",
+  "occurredAt": "2026-05-13T12:00:42.000Z"
 }
 ```
 
-Quando `status: FAILED`, o saldo bloqueado é devolvido automaticamente.
+Em `status: REJECTED`, os campos de comprovante (`reference`, `voucher`) podem vir `null` — a rede SPEI nunca confirmou a transação.
 
 ## Headers
 
 | Header | Valor |
 |---|---|
-| `X-NTXPay-Event` | `cash_out` |
-| `X-NTXPay-Signature` | `sha256=<hmac>` |
-| `X-NTXPay-Timestamp` | Unix epoch |
-| `X-NTXPay-Delivery` | UUID |
+| `x-event-id` | UUID único do evento (use para dedupe) |
+| `X-NTXPay-Signature` | `sha256=<hmac>` do corpo bruto |
 
 ## Comportamento
 
-- **At-least-once**: você pode receber `CONFIRMED` mais de uma vez. Deduplique por `transaction.id`.
-- **Falha após sucesso**: não acontece. Uma transação não muda de `CONFIRMED` para `FAILED`.
-- **Reversão**: se a contraparte (beneficiário) devolver, você recebe um evento `refund_in` separado, com `transaction.type = "refund_in"` linkado pelo `externalId`.
+- **At-least-once**: você pode receber o mesmo evento mais de uma vez. Deduplique por `x-event-id`.
+- **Falha após sucesso**: não acontece. Uma transação não muda de `LIQUIDATED` para `REJECTED`.
+- **Devolução**: se a contraparte devolver após a liquidação, você recebe `transaction.cash_out.returned` no webhook `refund_out`, com o mesmo `transactionId`.
 
 ## Resposta Esperada
 
-```http
-HTTP/1.1 200 OK
-```
+`200 OK` em até 10 segundos.
 
-## Exemplos de Handler
+## Processamento
 
-<CodeGroup>
-
-```typescript Node.js
-import express from 'express';
-import crypto from 'crypto';
-
-const app = express();
-app.use(express.raw({ type: 'application/json' })); // raw body for HMAC
-
-const SECRET = process.env.NTXPAY_WEBHOOK_SECRET!;
-
-app.post('/webhooks/ntxpay', (req, res) => {
-  const sig = req.header('X-NTXPay-Signature') ?? '';
-  const expected = 'sha256=' + crypto
-    .createHmac('sha256', SECRET)
-    .update(req.body) // req.body is Buffer
-    .digest('hex');
-
-  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
-    return res.status(401).end();
-  }
-
-  const event = JSON.parse(req.body.toString());
-  if (event.event === 'cash_out') {
-    if (event.transaction.status === 'CONFIRMED') {
-      markPayoutSettled(event.transaction.id);
-    } else if (event.transaction.status === 'FAILED') {
-      markPayoutFailed(event.transaction.id);
-    }
-  }
-
-  res.json({ received: true });
-});
-```
-
-```python Python
-import hmac
-import hashlib
-import json
-import os
-from flask import Flask, request, abort, jsonify
-
-app = Flask(__name__)
-SECRET = os.environ["NTXPAY_WEBHOOK_SECRET"].encode()
-
-@app.post("/webhooks/ntxpay")
-def webhook():
-    raw = request.get_data()  # raw bytes — required for HMAC
-    sig = request.headers.get("X-NTXPay-Signature", "")
-    expected = "sha256=" + hmac.new(SECRET, raw, hashlib.sha256).hexdigest()
-
-    if not hmac.compare_digest(sig, expected):
-        abort(401)
-
-    event = json.loads(raw)
-    if event["event"] == "cash_out":
-        status = event["transaction"]["status"]
-        tx_id = event["transaction"]["id"]
-        if status == "CONFIRMED":
-            mark_payout_settled(tx_id)
-        elif status == "FAILED":
-            mark_payout_failed(tx_id)
-
-    return jsonify(received=True)
-```
-
-```java Java
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.security.MessageDigest;
-import java.util.Map;
-
-@RestController
-public class NtxPayCashOutHandler {
-    private static final byte[] SECRET =
-        System.getenv("NTXPAY_WEBHOOK_SECRET").getBytes();
-    private final ObjectMapper mapper = new ObjectMapper();
-
-    @PostMapping(value = "/webhooks/ntxpay", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> handle(
-        @RequestHeader("X-NTXPay-Signature") String sig,
-        @RequestBody byte[] raw
-    ) throws Exception {
-        String expected = "sha256=" + hmacSha256Hex(SECRET, raw);
-        if (!MessageDigest.isEqual(sig.getBytes(), expected.getBytes())) {
-            return ResponseEntity.status(401).build();
-        }
-
-        Map<String, Object> event = mapper.readValue(raw, new TypeReference<>() {});
-        Map<String, Object> tx = (Map<String, Object>) event.get("transaction");
-        if ("cash_out".equals(event.get("event"))) {
-            long txId = ((Number) tx.get("id")).longValue();
-            String status = (String) tx.get("status");
-            if ("CONFIRMED".equals(status)) {
-                markPayoutSettled(txId);
-            } else if ("FAILED".equals(status)) {
-                markPayoutFailed(txId);
-            }
-        }
-
-        return ResponseEntity.ok(Map.of("received", true));
-    }
-
-    private static String hmacSha256Hex(byte[] secret, byte[] data) throws Exception {
-        Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(secret, "HmacSHA256"));
-        byte[] result = mac.doFinal(data);
-        StringBuilder sb = new StringBuilder(result.length * 2);
-        for (byte b : result) sb.append(String.format("%02x", b));
-        return sb.toString();
-    }
+```typescript
+const event = JSON.parse(rawBody.toString());
+if (event.event === 'transaction.cash_out.settled') {
+  await markPayoutSettled(event.transactionId);
+} else if (event.event === 'transaction.cash_out.rejected') {
+  await markPayoutFailed(event.transactionId); // saldo devolvido automaticamente
 }
 ```
 
-```go Go
-package main
-
-import (
-    "crypto/hmac"
-    "crypto/sha256"
-    "encoding/hex"
-    "encoding/json"
-    "io"
-    "net/http"
-    "os"
-)
-
-var secret = []byte(os.Getenv("NTXPAY_WEBHOOK_SECRET"))
-
-type cashOutEvent struct {
-    Event       string `json:"event"`
-    Transaction struct {
-        ID     int64  `json:"id"`
-        Status string `json:"status"`
-    } `json:"transaction"`
-}
-
-func handleCashOut(w http.ResponseWriter, r *http.Request) {
-    raw, _ := io.ReadAll(r.Body)
-
-    sig := r.Header.Get("X-NTXPay-Signature")
-    h := hmac.New(sha256.New, secret)
-    h.Write(raw)
-    expected := "sha256=" + hex.EncodeToString(h.Sum(nil))
-
-    if !hmac.Equal([]byte(sig), []byte(expected)) {
-        w.WriteHeader(http.StatusUnauthorized)
-        return
-    }
-
-    var event cashOutEvent
-    if err := json.Unmarshal(raw, &event); err == nil && event.Event == "cash_out" {
-        switch event.Transaction.Status {
-        case "CONFIRMED":
-            markPayoutSettled(event.Transaction.ID)
-        case "FAILED":
-            markPayoutFailed(event.Transaction.ID)
-        }
-    }
-
-    _ = json.NewEncoder(w).Encode(map[string]bool{"received": true})
-}
-
-func main() {
-    http.HandleFunc("/webhooks/ntxpay", handleCashOut)
-    _ = http.ListenAndServe(":8080", nil)
-}
-```
-
-</CodeGroup>
-
+Para o handler completo com validação HMAC e dedupe em Node.js, Python, Java e Go, veja [Implementação](/pt-br/guides/webhooks/implementation).

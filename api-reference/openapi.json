@@ -355,7 +355,7 @@
             "type": "array",
             "minItems": 1,
             "maxItems": 1,
-            "description": "Um webhook assina **exatamente UM** evento. O campo é um array por compatibilidade de contrato, mas deve conter um único item.",
+            "description": "Um webhook assina **exatamente UM** evento. O campo é um array por compatibilidade de contrato, mas deve conter um único item. Use `all` (Geral) para receber todos os eventos em uma única URL.",
             "items": {
               "type": "string",
               "enum": [
@@ -363,7 +363,8 @@
                 "cash_out",
                 "refund_in",
                 "refund_out",
-                "internal_transfer"
+                "internal_transfer",
+                "all"
               ]
             },
             "example": [
@@ -629,7 +630,7 @@
             "description": "Token inválido"
           },
           "502": {
-            "description": "mexico-ms indisponível"
+            "description": "Serviço temporariamente indisponível"
           }
         }
       }
@@ -675,7 +676,7 @@
             "description": "Token inválido"
           },
           "502": {
-            "description": "mexico-ms indisponível"
+            "description": "Serviço temporariamente indisponível"
           }
         }
       }
@@ -708,7 +709,7 @@
             "description": "Token inválido ou ausente"
           },
           "502": {
-            "description": "account-ms indisponível"
+            "description": "Serviço temporariamente indisponível"
           }
         }
       }
@@ -782,7 +783,7 @@
             "description": "Token inválido"
           },
           "502": {
-            "description": "account-ms indisponível"
+            "description": "Serviço temporariamente indisponível"
           }
         }
       }
@@ -828,7 +829,7 @@
             "description": "Token inválido"
           },
           "502": {
-            "description": "notification-ms indisponível"
+            "description": "Serviço temporariamente indisponível"
           }
         }
       }
@@ -875,7 +876,7 @@
             "description": "Webhook não encontrado"
           },
           "502": {
-            "description": "account-ms indisponível"
+            "description": "Serviço temporariamente indisponível"
           }
         }
       }

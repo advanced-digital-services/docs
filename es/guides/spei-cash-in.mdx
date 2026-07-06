@@ -1,17 +1,17 @@
 ---
 title: 'SPEI Cash-In'
-description: 'Recibe pagos SPEI vía CLABE desechable (one-time)'
+description: 'Recibe pagos SPEI vía CLABE desechable de un solo uso'
 ---
 
 ## Visión General
 
-El **SPEI cash-in** genera una **CLABE desechable** que el pagador usa para realizar una transferencia SPEI desde su app bancaria. Cuando NTX Pay recibe la liquidación, la transacción pasa a `CONFIRMED` y dispara el webhook `cash_in`.
+El **cash-in SPEI** genera una **CLABE desechable** que el pagador usa para hacer una transferencia SPEI desde la app de su banco. Cuando NTX Pay recibe la liquidación, se te notifica en el webhook `cash_in` con el evento `transaction.cash_in.settled`.
 
 Características:
 
-- CLABE válida para **una sola** transferencia (one-time use)
+- CLABE válida para una **única** transferencia (un solo uso)
 - Confirmación **asíncrona** (segundos a minutos)
-- Expira en fecha configurable (default ~24 horas)
+- Expira en una fecha configurable (por defecto ~24 horas)
 
 ## Endpoint
 
@@ -33,7 +33,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
   -d '{
     "amountCentavos": 50000,
     "externalId": "order-abc-123",
-    "description": "Pedido #123",
+    "description": "Order #123",
     "customerName": "Juan Perez",
     "customerEmail": "juan@example.com",
     "customerTaxId": "PEPJ800101ABC"
@@ -58,10 +58,12 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
 }
 ```
 
+Muestra la `destinationClabe` (y/o la `checkoutUrl`) al pagador final.
+
 ## Campos del Request
 
 <ParamField path="amountCentavos" type="integer" required>
-  Valor en centavos MXN (mínimo 1). Ej.: `50000` = $500.00 MXN.
+  Monto en centavos MXN (mínimo 1). Ej.: `50000` = $500.00 MXN.
 </ParamField>
 
 <ParamField path="externalId" type="string">
@@ -77,7 +79,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
 </ParamField>
 
 <ParamField path="customerEmail" type="string" required>
-  Email del pagador (formato de email válido).
+  Correo electrónico del pagador (formato de e-mail válido).
 </ParamField>
 
 <ParamField path="customerTaxId" type="string">
@@ -90,35 +92,50 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
 sequenceDiagram
     participant App as Tu aplicación
     participant NTX as NTX Pay
-    participant Pagador
-    participant Banco as Banco del pagador
+    participant Payer as Pagador
+    participant Bank as Banco del pagador
 
     App->>NTX: POST /api/spei/cash-in
     NTX-->>App: 201 + destinationClabe
-    App->>Pagador: Muestra CLABE (y/o checkoutUrl)
-    Pagador->>Banco: Transfiere SPEI a destinationClabe
-    Banco-->>NTX: Liquidación SPEI
-    NTX->>App: webhook cash_in (CONFIRMED)
+    App->>Payer: Muestra CLABE (y/o checkoutUrl)
+    Payer->>Bank: Transferencia SPEI a destinationClabe
+    Bank-->>NTX: Liquidación SPEI
+    NTX->>App: webhook cash_in (transaction.cash_in.settled)
 ```
 
 ## Estados de la Transacción
 
 | Status | Significado |
 |---|---|
-| `PENDING` | CLABE emitida, esperando transferencia |
+| `PENDING` | CLABE emitida, en espera de la transferencia |
 | `CONFIRMED` | Transferencia recibida y liquidada |
-| `FAILED` | Error en el procesamiento |
-| `EXPIRED` | CLABE expiró sin recibir transferencia |
+| `FAILED` | Error de procesamiento |
+| `EXPIRED` | La CLABE expiró sin recibir la transferencia |
+
+En el webhook, la liquidación llega como `transaction.cash_in.settled` con `status: LIQUIDATED` — consulta el [payload completo](/es/guides/webhooks/cash-in).
 
 ## Idempotencia
 
-Reenvía la misma request con el mismo `externalId` para garantizar que un fallo de red no genere dos cobros. En caso de duplicidad, NTX Pay retorna el cobro existente.
+Reenvía la misma solicitud con el mismo `externalId` para garantizar que una falla de red no genere dos cobros. En caso de duplicación, NTX Pay devuelve el cobro existente.
+
+## Probar en el Sandbox
+
+En el sandbox, la liquidación se simula en segundos — sin depender de un banco emisor. Controla el desenlace con el header `X-Sandbox-Scenario`:
+
+```bash
+curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Sandbox-Scenario: rejected" \
+  ...
+```
+
+Consulta el [catálogo de escenarios](/es/sandbox/scenarios) para forzar rechazo, devolución y retraso.
 
 ## Próximos Pasos
 
 <CardGroup cols={2}>
   <Card title="Webhook cash_in" href="/es/guides/webhooks/cash-in">
-    Detalles del payload del webhook de confirmación
+    Payload del webhook de confirmación
   </Card>
   <Card title="SPEI Cash-Out" href="/es/guides/spei-cash-out">
     Envía transferencias SPEI

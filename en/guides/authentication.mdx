@@ -1,16 +1,21 @@
 ---
 title: 'Authentication'
-description: 'X.509 certificate (mTLS) + OAuth 2.0 client_credentials to get an access JWT'
+description: 'Certificate + OAuth 2.0 client_credentials to obtain an access JWT'
+mode: 'wide'
 ---
 
 ## Overview
 
-The NTX Pay México API uses two-layer authentication:
+The NTX Pay Mexico API uses two-layer authentication:
 
-1. **X.509 certificate (mTLS)** — delivered by NTX Pay at onboarding, proves the client server's identity.
-2. **OAuth 2.0 client_credentials** — `clientId` + `clientSecret` received during onboarding, validated together with the certificate.
+1. **Certificate** — delivered by NTX Pay during onboarding, proves the identity of the client server.
+2. **OAuth 2.0 client_credentials** — `clientId` + `clientSecret` provided during onboarding, validated together with the certificate.
 
-The combination returns a **JWT** (10-minute validity) used in the other endpoints as `Authorization: Bearer ...`.
+The combination returns a **JWT** (valid for 10 minutes) used on the remaining endpoints as `Authorization: Bearer ...`.
+
+<Info>
+  Authentication in the **sandbox is identical** — what changes is the certificate + `clientId`/`clientSecret` pair, which is distinct from production. Production credentials against `https://sandbox.mx.ntxpay.com` return `401`.
+</Info>
 
 ## Endpoint
 
@@ -23,13 +28,13 @@ X-SSL-Client-Cert: <PEM-URL-encoded>
 Content-Type: application/json
 ```
 
-The `X-SSL-Client-Cert` is typically injected by NGINX/ALB with the URL-encoded certificate:
+The `X-SSL-Client-Cert` header is typically injected by NGINX/ALB with the URL-encoded certificate:
 
 ```nginx
 proxy_set_header X-SSL-Client-Cert $ssl_client_escaped_cert;
 ```
 
-In development, URL-encode manually:
+In development, URL-encode it manually:
 
 ```bash
 ENCODED_CERT=$(cat client.cert.pem | python3 -c "import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read()))")
@@ -60,7 +65,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/auth/token \
 
 ## Using the Token
 
-Include the `access_token` in all authenticated requests:
+Include the `access_token` in every authenticated request:
 
 ```bash
 curl -X GET https://sandbox.mx.ntxpay.com/api/balance \
@@ -69,24 +74,26 @@ curl -X GET https://sandbox.mx.ntxpay.com/api/balance \
 
 ## Renewal
 
-The token expires in **10 minutes (600s)**. Repeat step 1 before expiration — there is no refresh token.
+The token expires in **10 minutes (600s)**. Repeat step 1 before it expires — there is no refresh token.
 
 <Warning>
-  Don't cache the token across processes without an invalidation mechanism. Under high load, generate one token per worker and renew every ~8 minutes to avoid `401` due to expiration.
+  Do not cache the token across processes without an invalidation mechanism. Under high load, generate one token per worker and renew every ~8 minutes to avoid `401` errors due to expiration.
 </Warning>
 
 ## Common Errors
 
 | Code | Cause | Solution |
 |---|---|---|
-| `400` | Missing `X-SSL-Client-Cert` | Configure NGINX/ALB to forward the certificate |
+| `400` | `X-SSL-Client-Cert` missing | Configure NGINX/ALB to forward the certificate |
 | `400` | Malformed PEM | Verify that the certificate starts with `-----BEGIN CERTIFICATE-----` |
-| `401` | Invalid `clientId`/`clientSecret` | Re-check credentials (no trailing spaces) |
-| `401` | Expired/revoked certificate | Request renewal from NTX Pay |
+| `401` | Invalid `clientId`/`clientSecret` | Double-check the credentials (no extra spaces) |
+| `401` | Expired/revoked certificate | Request a renewal from NTX Pay |
 
-## Node.js Example
+## Code Examples
 
-```typescript
+<CodeGroup>
+
+```typescript Node.js
 import fs from 'fs';
 import axios from 'axios';
 
@@ -111,13 +118,136 @@ async function getToken(): Promise<string> {
 }
 ```
 
+```python Python
+import os
+import urllib.parse
+import requests
+
+with open("client.cert.pem", "r") as f:
+    cert = f.read()
+encoded_cert = urllib.parse.quote(cert)
+
+def get_token() -> str:
+    resp = requests.post(
+        "https://sandbox.mx.ntxpay.com/api/auth/token",
+        json={
+            "clientId": os.environ["NTXPAY_CLIENT_ID"],
+            "clientSecret": os.environ["NTXPAY_CLIENT_SECRET"],
+        },
+        headers={
+            "X-SSL-Client-Cert": encoded_cert,
+            "Content-Type": "application/json",
+        },
+        timeout=10,
+    )
+    resp.raise_for_status()
+    return resp.json()["access_token"]
+```
+
+```java Java
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+public class NtxPayAuth {
+    public static String getToken() throws Exception {
+        String cert = Files.readString(Path.of("client.cert.pem"));
+        String encodedCert = URLEncoder.encode(cert, StandardCharsets.UTF_8);
+
+        String body = """
+            {
+              "clientId": "%s",
+              "clientSecret": "%s"
+            }
+            """.formatted(
+                System.getenv("NTXPAY_CLIENT_ID"),
+                System.getenv("NTXPAY_CLIENT_SECRET")
+            );
+
+        HttpRequest req = HttpRequest.newBuilder()
+            .uri(URI.create("https://sandbox.mx.ntxpay.com/api/auth/token"))
+            .header("X-SSL-Client-Cert", encodedCert)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build();
+
+        HttpResponse<String> resp = HttpClient.newHttpClient()
+            .send(req, HttpResponse.BodyHandlers.ofString());
+
+        // Parse access_token with the JSON library of your choice (Jackson, Gson, etc.)
+        return resp.body();
+    }
+}
+```
+
+```go Go
+package main
+
+import (
+    "bytes"
+    "encoding/json"
+    "io"
+    "net/http"
+    "net/url"
+    "os"
+)
+
+type tokenResponse struct {
+    AccessToken string `json:"access_token"`
+}
+
+func getToken() (string, error) {
+    certBytes, err := os.ReadFile("client.cert.pem")
+    if err != nil {
+        return "", err
+    }
+    encodedCert := url.QueryEscape(string(certBytes))
+
+    payload, _ := json.Marshal(map[string]string{
+        "clientId":     os.Getenv("NTXPAY_CLIENT_ID"),
+        "clientSecret": os.Getenv("NTXPAY_CLIENT_SECRET"),
+    })
+
+    req, err := http.NewRequest(
+        "POST",
+        "https://sandbox.mx.ntxpay.com/api/auth/token",
+        bytes.NewReader(payload),
+    )
+    if err != nil {
+        return "", err
+    }
+    req.Header.Set("X-SSL-Client-Cert", encodedCert)
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
+        return "", err
+    }
+    defer resp.Body.Close()
+
+    body, _ := io.ReadAll(resp.Body)
+    var tr tokenResponse
+    if err := json.Unmarshal(body, &tr); err != nil {
+        return "", err
+    }
+    return tr.AccessToken, nil
+}
+```
+
+</CodeGroup>
+
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Get Started" href="/en/guides/get-started">
-    Full flow (token → transaction)
-  </Card>
   <Card title="Balance Query" href="/en/guides/balance">
-    Use the token to query the balance
+    Apply the Bearer token and query the account balance
+  </Card>
+  <Card title="SPEI Cash-In" href="/en/guides/spei-cash-in">
+    Create your first SPEI charge
   </Card>
 </CardGroup>

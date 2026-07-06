@@ -5,7 +5,7 @@ description: 'Envie transferências SPEI para qualquer CLABE'
 
 ## Visão Geral
 
-O **cash-out SPEI** envia uma transferência interbancária para uma **CLABE de destino**. O saldo da conta é debitado e a NTX Pay processa a transferência na rede SPEI. A confirmação chega via webhook `cash_out`.
+O **cash-out SPEI** envia uma transferência interbancária para uma **CLABE de destino**. O saldo da conta é debitado e a NTX Pay processa a transferência na rede SPEI. A confirmação chega no webhook `cash_out` com o evento `transaction.cash_out.settled`.
 
 ## Endpoint
 
@@ -88,8 +88,12 @@ if (balance.availableCentavos < amountCentavos) {
 | Status | Significado |
 |---|---|
 | `PENDING` | Cash-out aceito, aguardando liquidação SPEI |
-| `CONFIRMED` | Liquidado no Banxico |
-| `FAILED` | Rejeitado pela rede SPEI |
+| `CONFIRMED` | Liquidado na rede SPEI |
+| `FAILED` | Rejeitado pela rede SPEI — o saldo debitado é devolvido |
+
+No webhook, os desfechos chegam como `transaction.cash_out.settled` (`LIQUIDATED`) e `transaction.cash_out.rejected` (`REJECTED`) — veja o [payload completo](/pt-br/guides/webhooks/cash-out).
+
+**Devolução após a liquidação:** se o banco da contraparte devolver a transferência, o saldo é creditado de volta e você recebe `transaction.cash_out.returned` no webhook [`refund_out`](/pt-br/guides/webhooks/refund-out).
 
 ## Códigos de Erro
 
@@ -97,7 +101,7 @@ if (balance.availableCentavos < amountCentavos) {
 |---|---|
 | `400` | Saldo insuficiente, CLABE inválida, payload inválido |
 | `401` | Token inválido |
-| `502` | Falha temporária no processamento — não tente novamente sem verificar o status via `GET /api/transactions` |
+| `502` | Falha temporária no processamento — não tente novamente sem confirmar o desfecho da transação original (aguarde o webhook) |
 
 ## Exemplo em Node.js com Retry
 
@@ -112,18 +116,25 @@ async function speiCashOut(token: string, dto: any) {
     return data; // status: PENDING
   } catch (err) {
     if (err.response?.status === 502) {
-      // Não sabemos se a transação foi criada. Consulte /api/transactions filtrando por externalId
-      // antes de tentar novamente.
+      // Não sabemos se a transação foi criada. Aguarde o webhook (ou contate o
+      // suporte) antes de tentar novamente — retry cego pode duplicar o envio.
     }
     throw err;
   }
 }
 ```
 
+## Testar no Sandbox
+
+No sandbox, o pipeline completo roda — saldo debitado, tarifa cobrada, extrato gerado — e a liquidação é simulada em segundos. Sua conta precisa de saldo: faça um [cash-in](/pt-br/guides/spei-cash-in) antes. Force rejeição, devolução e falhas síncronas com o header `X-Sandbox-Scenario` — veja o [catálogo de cenários](/pt-br/sandbox/scenarios).
+
 ## Próximos Passos
 
 <CardGroup cols={2}>
   <Card title="Webhook cash_out" href="/pt-br/guides/webhooks/cash-out">
-    Detalhes do payload do webhook de liquidação
+    Payload do webhook de liquidação
+  </Card>
+  <Card title="Webhook refund_out" href="/pt-br/guides/webhooks/refund-out">
+    Como chegam as devoluções de cash-out
   </Card>
 </CardGroup>

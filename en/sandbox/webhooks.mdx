@@ -1,58 +1,64 @@
 ---
-title: 'Webhooks'
-description: 'How the sandbox delivers webhooks and how to test dedupe, retries, and signature.'
+title: 'Simulated webhooks'
+description: 'How to trigger each event in the sandbox and validate dedupe, retries, and signature.'
 mode: 'wide'
 ---
 
 ## How it works
 
-The sandbox uses the **same outbox engine** as production. That means:
+The sandbox uses the **same delivery engine** as production:
 
-- Same payload structure
-- Same headers (`X-NTXPay-Delivery`, `X-NTXPay-Signature`, etc.)
-- Same exponential retry policy
+- Same payload structure — see the [full contract](/en/guides/webhooks/overview)
+- Same headers (`x-event-id`, `X-NTXPay-Signature`)
+- Same retry policy (5 attempts, exponential backoff, 10s timeout)
 - Same HMAC signature format
 
-The only difference is **speed**: sandbox webhooks fire ~1 second after the request (vs. minutes in production), and you can force artificial delays via the `delayed:` scenario.
+The difference is the **origin**: instead of waiting for real settlement on the SPEI network, the simulator resolves the transaction in seconds — and you control the outcome via [scenarios](/en/sandbox/scenarios).
 
-## Register URL
+[Webhook configuration](/en/guides/webhooks/setup) is identical to production — register your URL via `POST /api/webhooks-config` as usual.
+
+## Two ways to trigger a webhook
+
+### 1. Test webhook (no transaction)
+
+The fastest way to validate your endpoint — it fires a signed delivery without moving anything:
 
 ```bash
-curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
+curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config/test \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "url": "https://my-server.com/webhooks/ntxpay",
-    "events": ["cash_in"]
+    "eventType": "cash_in",
+    "status": "LIQUIDATED"
   }'
 ```
 
-### Response (201)
+The response tells you immediately whether your endpoint returned `2xx`, the response time, and the signature that was sent. Vary the `status` (`LIQUIDATED`, `PENDING`, `REJECTED`, `RETURNED`) to exercise each path in your handler. Field details in [Setup](/en/guides/webhooks/setup#test-webhook).
 
-```json
-{
-  "id": "wh_550e8400",
-  "url": "https://my-server.com/webhooks/ntxpay",
-  "events": ["cash_in"],
-  "secret": "whsec_a1b2c3d4...",
-  "createdAt": "2026-03-26T09:00:00.000Z"
-}
-```
+### 2. Simulated transaction (full flow)
 
-Save the returned `secret` — it is used to verify the HMAC signature. **It is only displayed once.**
+Create a [cash-in](/en/guides/spei-cash-in) or [cash-out](/en/guides/spei-cash-out) with the `X-Sandbox-Scenario` header — the entire pipeline runs (balance, fee, statement) and the webhook arrives in seconds with the outcome you chose:
 
-## Available events
+| To receive | Use scenario | On webhook type |
+|---|---|---|
+| `*.settled` (`LIQUIDATED`) | `success` (or no header) | `cash_in` / `cash_out` |
+| `*.settled` with ~30s delay | `pending_long` | `cash_in` / `cash_out` |
+| `*.rejected` (`REJECTED`) | `rejected` or `insufficient_funds` | `cash_in` / `cash_out` |
+| `*.returned` (`RETURNED`) | `returned` or `bad_clabe` | `refund_in` / `refund_out` |
 
-| Event | Fired when |
-|---|---|
-| `cash_in` | Disposable CLABE receives a (simulated) transfer |
-| `cash_out` | SPEI send resolves (confirmed or failed) |
-| `refund_in` | Cash-in refund is processed |
-| `refund_out` | Cash-out refund is processed |
+See the [full scenario catalog](/en/sandbox/scenarios).
 
-## Verify the signature
+## Testing dedupe
 
-Each webhook arrives with the `X-NTXPay-Signature` header in the `sha256=<hex>` format:
+Each delivery carries a unique `x-event-id`. To test your dedupe:
+
+1. Configure your handler to return `500` on the first attempt.
+2. NTX Pay will deliver the same message again (with the **same** `x-event-id`).
+3. Confirm that your system ignores the duplicate and responds `200` on the second attempt.
+
+## Testing the signature
+
+Point a test webhook at your endpoint and validate the `X-NTXPay-Signature` with the `secret` returned at creation:
 
 ```python
 import hmac
@@ -67,45 +73,11 @@ def verify(payload_bytes: bytes, signature_header: str, secret: str) -> bool:
     return hmac.compare_digest(expected, signature_header)
 ```
 
-## Test dedupe
-
-Each delivery has a unique `deliveryId` in the `X-NTXPay-Delivery` header and inside the payload. To test your dedupe:
-
-1. Make your handler return `500` on the first attempt.
-2. NTX Pay will deliver the same message again (with the **same** `deliveryId`).
-3. Confirm your system ignores the duplicate and responds `200` on the second attempt.
-
-## Retry policy
-
-| Attempt | Delay after previous |
-|---|---|
-| 1 | immediate |
-| 2 | 30s |
-| 3 | 2min |
-| 4 | 10min |
-| 5 | 1h |
-| 6 | 6h |
-| 7+ | given up |
-
-Your endpoint must respond `2xx` within **5 seconds** — any `5xx`, timeout, or connection error triggers a retry.
-
-## Test scenarios
-
-Force the webhook to come back as `FAILED` or with delay:
-
-```bash
-curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "X-Sandbox-Scenario: pending_long" \
-  -H "Content-Type: application/json" \
-  -d '{ ... }'
-```
-
-See [Scenarios](/en/sandbox/scenarios) for the full catalog.
+Complete handlers in Node.js, Python, Java, and Go: [Implementation](/en/guides/webhooks/implementation).
 
 ## Best practices
 
-1. **Respond 200 before processing** — queue the event in the background; five seconds is the ceiling.
-2. **Use `deliveryId` for dedupe** — do not rely on `transaction.id` (retries arrive with the same `transaction.id` but a new `deliveryId` on manual redrive).
-3. **Don't depend on order** — webhooks can arrive out of order after retries.
-4. **Always verify the signature** — even in sandbox.
+1. **Validate the signature** — always, even in the sandbox.
+2. **Use `x-event-id` for dedupe** — the same event may be redelivered.
+3. **Do not rely on ordering** — webhooks may arrive out of order after retries.
+4. **Exercise all four statuses** before going to production — that is what the sandbox is for.

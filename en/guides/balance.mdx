@@ -1,14 +1,14 @@
 ---
 title: 'Balance Query'
-description: 'Account available and pending balance in MXN centavos'
+description: 'Available and pending account balance in MXN centavos'
 ---
 
 ## Overview
 
 The `GET /api/balance` endpoint returns the authenticated account's balance in **MXN centavos** (integers). There are two fields:
 
-- **`availableCentavos`** — balance available to send SPEI cash-out
-- **`pendingCentavos`** — blocked balance (cash-out in processing, cash-in confirming)
+- **`availableCentavos`** — balance available for sending SPEI cash-out
+- **`pendingCentavos`** — blocked balance (cash-out in processing, cash-in awaiting confirmation)
 
 ## Endpoint
 
@@ -46,11 +46,11 @@ curl -X GET https://sandbox.mx.ntxpay.com/api/balance \
 </ResponseField>
 
 <ResponseField name="pendingCentavos" type="integer">
-  Pending balance in MXN centavos. Includes cash-out in processing and cash-in waiting for final settlement confirmation.
+  Pending balance in MXN centavos. Includes cash-out in processing and cash-in awaiting final settlement confirmation.
 </ResponseField>
 
 <ResponseField name="currency" type="string">
-  Always `MXN` in the México scope.
+  Always `MXN` within the Mexico scope.
 </ResponseField>
 
 ## Node.js Example
@@ -92,16 +92,16 @@ async function safeSpeiCashOut(amountCentavos: number, token: string, dto: any) 
 ```
 
 <Info>
-  Even validating the balance beforehand, the cash-out may fail with `400` if another concurrent cash-out consumes the balance. Treat the `400` error as "insufficient balance" at the call time.
+  Even after validating the balance, the cash-out can still fail with `400` if a concurrent cash-out consumes the balance. Treat the `400` error as "insufficient balance" at call time.
 </Info>
 
 ## Response Codes
 
 | Code | Meaning |
 |---|---|
-| `200` | Balance queried |
+| `200` | Balance retrieved |
 | `401` | Invalid or missing token |
-| `502` | `account-ms` unavailable |
+| `502` | Service temporarily unavailable — try again |
 
 ## Next Steps
 

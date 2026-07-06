@@ -1,48 +1,55 @@
 ---
-title: 'Evento cash_in'
-description: 'Notificación enviada cuando un SPEI cash-in es confirmado'
+title: 'Webhook cash_in'
+description: 'Notificaciones del ciclo de vida de un SPEI cash-in'
+mode: 'wide'
 ---
 
-## Cuándo dispara
+## Cuándo se dispara
 
-El evento `cash_in` se dispara cuando:
+El webhook del tipo `cash_in` recibe los eventos del ciclo de vida de un cobro creado vía `POST /api/spei/cash-in`:
 
-- Una transferencia SPEI llega a la **CLABE desechable** emitida por `POST /api/spei/cash-in` y es liquidada
+| `event` | `status` | Significado |
+|---|---|---|
+| `transaction.cash_in.settled` | `LIQUIDATED` | La transferencia SPEI llegó a la CLABE desechable y fue liquidada |
+| `transaction.cash_in.rejected` | `REJECTED` | La red SPEI rechazó la transferencia |
+| `transaction.cash_in.pending` | `PENDING` | Actualización intermedia de procesamiento |
+
+<Info>
+  La **devolución** de un cash-in ya liquidado (`transaction.cash_in.returned`) se entrega en el webhook del tipo [`refund_in`](/es/guides/webhooks/refund-in), no en el `cash_in`.
+</Info>
 
 ## Payload
 
 ```json
 {
-  "event": "cash_in",
-  "deliveryId": "8e2c5b6f-3a12-4b9c-9a18-77a2b3c4d5e6",
-  "createdAt": "2026-05-12T14:31:05.000Z",
-  "transaction": {
-    "id": 12345,
-    "externalId": "order-abc-123",
-    "paymentMethod": "SPEI",
-    "direction": "in",
-    "type": "cash_in",
-    "status": "CONFIRMED",
-    "amountCentavos": 50000,
-    "clabe": "012180001234567890",
-    "createdAt": "2026-05-12T14:30:00.000Z",
-    "confirmedAt": "2026-05-12T14:31:05.000Z"
-  }
+  "event": "transaction.cash_in.settled",
+  "transactionId": "8e2c5b6f-3a12-4b9c-9a18-77a2b3c4d5e6",
+  "amount": 50000,
+  "currency": "MXN",
+  "status": "LIQUIDATED",
+  "destinationClabe": "012180001234567890",
+  "sourceClabe": "646180123456789012",
+  "reference": "1234567",
+  "voucher": "CEP20260512A1B2C3",
+  "occurredAt": "2026-05-12T14:31:05.000Z"
 }
 ```
+
+- `destinationClabe` — la CLABE desechable emitida al crear el cobro
+- `sourceClabe` — la CLABE del pagador (cuando la red la informa)
+- `amount` — monto en centavos MXN
+- Los campos de referencia (`reference`, `voucher`) pueden venir `null` dependiendo del flujo
 
 ## Headers
 
 | Header | Valor |
 |---|---|
-| `X-NTXPay-Event` | `cash_in` |
-| `X-NTXPay-Signature` | `sha256=<hmac>` |
-| `X-NTXPay-Timestamp` | Unix epoch (segundos) |
-| `X-NTXPay-Delivery` | UUID único del envío |
+| `x-event-id` | UUID único del evento (úsalo para dedupe) |
+| `X-NTXPay-Signature` | `sha256=<hmac>` del cuerpo crudo |
 
 ## Respuesta Esperada
 
-Responde `200 OK` en menos de 10 segundos. Ante cualquier status distinto, NTX Pay reintenta hasta 5 veces en backoff exponencial.
+Responde `200 OK` en menos de 10 segundos. Ante cualquier status distinto de `2xx`, NTX Pay reintenta hasta 5 veces con backoff exponencial.
 
 ```http
 HTTP/1.1 200 OK
@@ -51,35 +58,15 @@ Content-Type: application/json
 {"received": true}
 ```
 
-## Ejemplo de Handler (Node.js / Express)
+## Procesamiento
+
+Marca la orden como pagada solamente cuando `event` sea `transaction.cash_in.settled` (o `status: LIQUIDATED`):
 
 ```typescript
-import express from 'express';
-import crypto from 'crypto';
-
-const app = express();
-app.use(express.raw({ type: 'application/json' })); // raw body para HMAC
-
-const SECRET = process.env.NTXPAY_WEBHOOK_SECRET!;
-
-app.post('/webhooks/ntxpay', (req, res) => {
-  const sig = req.header('X-NTXPay-Signature') ?? '';
-  const expected = 'sha256=' + crypto
-    .createHmac('sha256', SECRET)
-    .update(req.body) // req.body es Buffer
-    .digest('hex');
-
-  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
-    return res.status(401).end();
-  }
-
-  const event = JSON.parse(req.body.toString());
-  if (event.event === 'cash_in' && event.transaction.status === 'CONFIRMED') {
-    enqueue(event); // procesa async
-  }
-
-  res.json({ received: true });
-});
+const event = JSON.parse(rawBody.toString());
+if (event.event === 'transaction.cash_in.settled') {
+  await markOrderPaid(event.transactionId, event.amount);
+}
 ```
 
-Ver el [guía de implementación](/es/guides/webhooks/implementation) para Python y PHP.
+Para el handler completo con validación HMAC y dedupe en Node.js, Python, Java y Go, consulta [Implementación](/es/guides/webhooks/implementation).

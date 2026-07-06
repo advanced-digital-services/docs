@@ -5,7 +5,7 @@ description: 'Send SPEI transfers to any CLABE'
 
 ## Overview
 
-**SPEI cash-out** sends an interbank transfer to a **destination CLABE**. The account balance is debited and NTX Pay processes the transfer over the SPEI network. Confirmation arrives via `cash_out` webhook.
+**SPEI cash-out** sends an interbank transfer to a **destination CLABE**. The account balance is debited and NTX Pay processes the transfer on the SPEI network. Confirmation arrives on the `cash_out` webhook with the `transaction.cash_out.settled` event.
 
 ## Endpoint
 
@@ -49,7 +49,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
 ## Request Fields
 
 <ParamField path="amountCentavos" type="integer" required>
-  Value in MXN centavos (minimum 1). Ex.: `50000` = $500.00 MXN.
+  Amount in MXN centavos (minimum 1). E.g. `50000` = $500.00 MXN.
 </ParamField>
 
 <ParamField path="destinationClabe" type="string" required>
@@ -80,16 +80,20 @@ if (balance.availableCentavos < amountCentavos) {
 ```
 
 <Warning>
-  Insufficient balance returns `400` — the transaction is **not created**. Apply idempotency on the client side (don't reprocess the same order after `400` without revalidating the balance).
+  Insufficient balance returns `400` — the transaction is **not created**. Apply idempotency on the client side (do not reprocess the same order after a `400` without revalidating the balance).
 </Warning>
 
 ## States
 
 | Status | Meaning |
 |---|---|
-| `PENDING` | Cash-out accepted, waiting for SPEI settlement |
-| `CONFIRMED` | Settled at Banxico |
-| `FAILED` | Rejected by the SPEI network |
+| `PENDING` | Cash-out accepted, awaiting SPEI settlement |
+| `CONFIRMED` | Settled on the SPEI network |
+| `FAILED` | Rejected by the SPEI network — the debited balance is refunded |
+
+On the webhook, the outcomes arrive as `transaction.cash_out.settled` (`LIQUIDATED`) and `transaction.cash_out.rejected` (`REJECTED`) — see the [full payload](/en/guides/webhooks/cash-out).
+
+**Return after settlement:** if the counterparty's bank returns the transfer, the balance is credited back and you receive `transaction.cash_out.returned` on the [`refund_out`](/en/guides/webhooks/refund-out) webhook.
 
 ## Error Codes
 
@@ -97,7 +101,7 @@ if (balance.availableCentavos < amountCentavos) {
 |---|---|
 | `400` | Insufficient balance, invalid CLABE, invalid payload |
 | `401` | Invalid token |
-| `502` | Service temporarily unavailable — don't retry without checking status via `GET /api/transactions` |
+| `502` | Temporary processing failure — do not retry without confirming the outcome of the original transaction (wait for the webhook) |
 
 ## Node.js Example with Retry
 
@@ -112,18 +116,25 @@ async function speiCashOut(token: string, dto: any) {
     return data; // status: PENDING
   } catch (err) {
     if (err.response?.status === 502) {
-      // We don't know if the transaction was created. Query /api/transactions filtering by externalId
-      // before retrying.
+      // We don't know whether the transaction was created. Wait for the webhook
+      // (or contact support) before retrying — a blind retry can duplicate the transfer.
     }
     throw err;
   }
 }
 ```
 
+## Testing in the Sandbox
+
+In the sandbox, the full pipeline runs — balance debited, fee charged, statement generated — and settlement is simulated within seconds. Your account needs balance: do a [cash-in](/en/guides/spei-cash-in) first. Force rejection, return, and synchronous failures with the `X-Sandbox-Scenario` header — see the [scenario catalog](/en/sandbox/scenarios).
+
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="cash_out webhook" href="/en/guides/webhooks/cash-out">
-    Details of the settlement webhook payload
+  <Card title="cash_out Webhook" href="/en/guides/webhooks/cash-out">
+    Settlement webhook payload
+  </Card>
+  <Card title="refund_out Webhook" href="/en/guides/webhooks/refund-out">
+    How cash-out returns arrive
   </Card>
 </CardGroup>

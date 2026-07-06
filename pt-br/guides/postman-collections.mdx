@@ -6,7 +6,7 @@ mode: 'wide'
 
 ## Como obter a coleção
 
-A coleção oficial do Postman com todos os endpoints públicos da NTX Pay México é distribuída sob demanda. Solicite o arquivo `.json` (Postman v2.1) por e-mail para `support@ntxpay.com`.
+A coleção oficial do Postman com todos os endpoints públicos da NTX Pay México é distribuída sob demanda. Solicite o arquivo `.json` (Postman v2.1) por e-mail para `suporte@ntxpay.com`.
 
 ## Importar no Postman
 
@@ -31,14 +31,14 @@ A coleção está organizada na ordem típica de uso:
 
 1. **Auth → Generate Token** — execute primeiro. O response salva automaticamente o `access_token` em uma variável de environment.
 2. **SPEI → Cash-In** — cria uma cobrança simulada para confirmar que o token está funcionando.
-3. **Transactions → List** — consulta o estado da cobrança recém-criada.
+3. **Webhooks Config → Test** — dispara um webhook de teste no seu endpoint.
 
 ## Pastas Disponíveis
 
 - `Auth` — geração de JWT
-- `SPEI` — cash-in, cash-out, get transaction by externalId
-- `Transactions` — listar
-- `Webhooks Config` — listar, criar, deletar
+- `SPEI` — cash-in, cash-out
+- `Balance` — consulta de saldo
+- `Webhooks Config` — listar, criar, testar, deletar
 
 ## Alternativas
 
@@ -50,4 +50,4 @@ Prefere outra ferramenta?
 
 ## Suporte
 
-`support@ntxpay.com`
+`suporte@ntxpay.com`
