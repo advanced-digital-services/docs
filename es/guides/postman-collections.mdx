@@ -1,27 +1,19 @@
 ---
-title: 'Postman Collections'
+title: 'Colecciones Postman'
 description: 'Importa la colección oficial de Postman para probar la API NTX Pay localmente.'
+mode: 'wide'
 ---
 
-## Descarga
+## Cómo obtener la colección
 
-Mantenemos una colección de Postman lista para usar con todos los endpoints públicos de la API NTX Pay México.
-
-<CardGroup cols={2}>
-  <Card title="Descargar (.json)" href="https://app.ntxpay.com/postman/ntxpay-mexico.postman_collection.json">
-    Colección Postman v2.1
-  </Card>
-  <Card title="Environments" href="https://app.ntxpay.com/postman/ntxpay-environments.zip">
-    Sandbox y Producción
-  </Card>
-</CardGroup>
+La colección oficial de Postman con todos los endpoints públicos de NTX Pay México se distribuye bajo demanda. Solicita el archivo `.json` (Postman v2.1) por correo a `suporte@ntxpay.com`.
 
 ## Importar en Postman
 
 1. Abre Postman
 2. **File → Import**
-3. Selecciona el archivo `.json` descargado
-4. Importa también el zip de environments y elige **Sandbox** para iniciar las pruebas
+3. Selecciona el archivo `.json` recibido
+4. Importa también el environment proporcionado y elige **Sandbox** para iniciar las pruebas
 
 ## Configurar Variables del Environment
 
@@ -31,24 +23,22 @@ El environment espera 3 variables:
 |---|---|---|
 | `clientId` | OAuth client_id de tu cuenta | `qr-93-550e8400` |
 | `clientSecret` | OAuth client_secret | `a1b2c3d4...` |
-| `certificatePem` | Certificado X.509 en una sola línea (sin saltos de línea, con `\n` literal) | `-----BEGIN CERTIFICATE-----\n...` |
+| `certificatePem` | Certificado X.509 en una sola línea (sin saltos, con `\n` literal) | `-----BEGIN CERTIFICATE-----\n...` |
 
 ## Flujo Sugerido
 
-La colección está organizada en el orden de uso típico:
+La colección está organizada en el orden típico de uso:
 
-1. **Auth → Generate Token** — ejecuta primero. El response guarda automáticamente el `access_token` en una variable de environment.
-2. **Balance → Get Balance** — verifica que el token funcione.
-3. **SPEI → Cash-In** — crea un cobro simulado.
-4. **Transactions → List** — consulta el estado.
+1. **Auth → Generate Token** — ejecútalo primero. El response guarda automáticamente el `access_token` en una variable de environment.
+2. **SPEI → Cash-In** — crea un cobro simulado para confirmar que el token está funcionando.
+3. **Webhooks Config → Test** — dispara un webhook de prueba en tu endpoint.
 
 ## Carpetas Disponibles
 
 - `Auth` — generación de JWT
+- `SPEI` — cash-in, cash-out
 - `Balance` — consulta de saldo
-- `SPEI` — cash-in, cash-out, transaction by external ID
-- `Transactions` — listar
-- `Webhooks Config` — listar, crear, eliminar
+- `Webhooks Config` — listar, crear, probar, eliminar
 
 ## Alternativas
 
@@ -57,3 +47,7 @@ La colección está organizada en el orden de uso típico:
 - **Insomnia**: importa el mismo `.json` (compatible con Postman v2.1)
 - **OpenAPI / Bruno**: usa nuestro [`openapi.json`](/api-reference/openapi.json) directamente
 - **cURL**: cada página de endpoint en esta documentación tiene un ejemplo cURL listo para copiar
+
+## Soporte
+
+`suporte@ntxpay.com`

@@ -1,36 +1,34 @@
 ---
 title: 'Get Started'
-description: 'Welcome to the NTX Pay México API. This guide walks you through the first steps to integrate and start using SPEI.'
+description: 'Welcome to the NTX Pay Mexico API. This guide walks you through the first steps to integrate and start using SPEI.'
+mode: 'wide'
 ---
 
 ## Overview
 
-The NTX Pay México API lets your company perform payment operations, check balances, reconcile transactions and receive webhook notifications — all securely and at scale. Authentication is via **X.509 certificate (mTLS) + OAuth 2.0**, returning a short-lived **JWT** for each request.
+The NTX Pay Mexico API lets your company execute payment operations, reconcile transactions, and receive webhook notifications — all in a secure and scalable way. Authentication uses an **X.509 certificate (mTLS) + OAuth 2.0**, returning a short-lived **JWT** for each request.
 
-## Getting Started with Sandbox
+## Step by Step in the Sandbox
 
 <Steps>
   <Step title="Request a sandbox account">
     Contact your account manager or write to `contact@ntxpay.com` to request a sandbox account.
   </Step>
   <Step title="Receive your credentials">
-    You will receive a **certificate** and **OAuth credentials** (`clientId` + `clientSecret`) for the sandbox account.
+    You will receive a **certificate** and the **OAuth credentials** (`clientId` + `clientSecret`) associated with the sandbox account.
   </Step>
   <Step title="Register your webhook URL">
-    Register your webhook URL via `POST /api/webhooks-config` so you can receive simulated webhook events.
+    Register your webhook URL via `POST /api/webhooks-config` to receive simulated events.
 
     ```bash
     curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
       -H "Authorization: Bearer $TOKEN" \
       -H "Content-Type: application/json" \
       -d '{
-        "url": "https://my-server.com/webhooks/ntxpay",
+        "url": "https://meu-servidor.com/webhooks/ntxpay",
         "events": ["cash_in"]
       }'
     ```
-  </Step>
-  <Step title="Confirm sandbox mode in the dashboard">
-    In the dashboard, go to **Settings** to confirm your account is configured in sandbox mode.
   </Step>
   <Step title="Authenticate and simulate scenarios">
     Authenticate, make API calls, and use the `X-Sandbox-Scenario` header to simulate different outcomes (immediate confirmation, failure, expiration, etc.).
@@ -50,13 +48,29 @@ The NTX Pay México API lets your company perform payment operations, check bala
   </Step>
 </Steps>
 
-## Environments
+## Environment
 
 | Environment | URL |
 |---|---|
 | Sandbox | `https://sandbox.mx.ntxpay.com` |
-| Production | Provided at onboarding |
+
+## Integration Path
+
+<CardGroup cols={2}>
+  <Card title="Authentication" href="/en/guides/authentication">
+    Certificate + OAuth 2.0 to obtain the JWT
+  </Card>
+  <Card title="SPEI Cash-In" href="/en/guides/spei-cash-in">
+    Receive payments via a disposable CLABE
+  </Card>
+  <Card title="Webhooks" href="/en/guides/webhooks/overview">
+    Receive notifications for every event
+  </Card>
+  <Card title="Sandbox" href="/en/sandbox/introduction">
+    Test scenarios and simulated webhooks
+  </Card>
+</CardGroup>
 
 ## Support
 
-`contact@ntxpay.com` · `https://app.ntxpay.com`
+`suporte@ntxpay.com`

@@ -21,7 +21,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
 ```
 
 <Warning>
-  A maioria dos cenários controla o **webhook assíncrono**: a resposta HTTP é `201 Created` com `status: PENDING`, e o resultado final (`CONFIRMED`, `FAILED` ou `RETURNED`) chega no webhook. As exceções são `timeout` e `provider_5xx`, que falham na resposta HTTP **síncrona**.
+  A maioria dos cenários controla o **webhook assíncrono**: a resposta HTTP é `201 Created` com `status: PENDING`, e o resultado final chega no webhook. As exceções são `timeout` e `provider_5xx`, que falham na resposta HTTP **síncrona**.
 </Warning>
 
 ## Cenários disponíveis
@@ -30,16 +30,20 @@ Os valores canônicos de cenário são: `success`, `pending_long`, `rejected`, `
 
 ### Cenários de resultado assíncrono
 
-Retornam `201 PENDING` de forma síncrona; o estado final chega via webhook.
+Retornam `201 PENDING` de forma síncrona; o estado final chega via webhook em segundos.
 
-| Header Value | Resultado do webhook | Notas |
+| Header Value | Webhook resultante | Notas |
 |---|---|---|
-| `success` (default) | `CONFIRMED` em ~1s | Também usado quando nenhum header é enviado |
-| `pending_long` | `CONFIRMED` após ~30s | Testa settlement lento |
-| `rejected` | `FAILED` | A rede SPEI rejeitou a transferência |
-| `returned` | `RETURNED` | Aceita e depois devolvida pelo banco contraparte |
-| `insufficient_funds` | `FAILED` com `errorCode: INSUFFICIENT_FUNDS` | **Apenas cash-out** |
-| `bad_clabe` | `RETURNED` com `errorCode: INVALID_CLABE` | **Apenas cash-out** — aceita e depois devolvida |
+| `success` (default) | `*.settled` — `status: LIQUIDATED` | Também usado quando nenhum header é enviado |
+| `pending_long` | `*.settled` — `status: LIQUIDATED` após ~30s | Testa liquidação lenta |
+| `rejected` | `*.rejected` — `status: REJECTED` | A rede SPEI rejeitou a transferência |
+| `returned` | `*.returned` — `status: RETURNED` | Aceita e depois devolvida pela contraparte |
+| `insufficient_funds` | `cash_out.rejected` — `status: REJECTED` | **Apenas cash-out** — simula rejeição por falta de fundos |
+| `bad_clabe` | `cash_out.returned` — `status: RETURNED` | **Apenas cash-out** — aceita e devolvida por CLABE inválida |
+
+<Warning>
+  Os eventos `*.returned` são entregues no webhook do tipo **`refund_in`/`refund_out`** (ou `all`), não no `cash_in`/`cash_out`. Para testar os cenários `returned` e `bad_clabe`, registre também esses webhooks — veja [tipos de webhook](/pt-br/guides/webhooks/overview).
+</Warning>
 
 ### Cenários de erro síncrono
 
@@ -47,7 +51,7 @@ Falham na própria resposta HTTP — nenhum webhook é enviado.
 
 | Header Value | Resposta síncrona |
 |---|---|
-| `timeout` | Timeout upstream (`504`) após ~16s |
+| `timeout` | Timeout no processamento (`504`) após ~16s |
 | `provider_5xx` | Serviço temporariamente indisponível (`503`) |
 
 <Info>
@@ -56,64 +60,43 @@ Falham na própria resposta HTTP — nenhum webhook é enviado.
 
 ## Exemplo: webhook de sucesso
 
-```json
-{
-  "event": "cash_out",
-  "deliveryId": "8e2c5b6f-3a12-4b9c-9a18-77a2b3c4d5e6",
-  "createdAt": "2026-03-26T10:00:00.000Z",
-  "transaction": {
-    "id": 12345,
-    "externalId": "test-success-001",
-    "paymentMethod": "SPEI",
-    "direction": "out",
-    "type": "cash_out",
-    "status": "CONFIRMED",
-    "amountCentavos": 15000,
-    "clabe": "012180001234567890",
-    "referenceNumerical": "9876543",
-    "createdAt": "2026-03-26T09:59:59.000Z",
-    "confirmedAt": "2026-03-26T10:00:00.000Z",
-    "counterpart": {
-      "name": "Maria Lopez",
-      "taxId": null,
-      "bank": {}
-    }
-  },
-  "errorCode": null,
-  "errorMessage": null,
-  "metadata": {}
-}
-```
-
-## Exemplo: webhook de falha
+Cenário `success` em um cash-out — o webhook `cash_out` recebe:
 
 ```json
 {
-  "event": "cash_out",
-  "deliveryId": "1a3f9e8d-2c47-4b9c-aa18-77a2b3c4d5e6",
-  "createdAt": "2026-03-26T10:01:00.000Z",
-  "transaction": {
-    "id": 12346,
-    "externalId": "test-error-001",
-    "paymentMethod": "SPEI",
-    "direction": "out",
-    "type": "cash_out",
-    "status": "FAILED",
-    "amountCentavos": 15000,
-    "clabe": "012180001234567890",
-    "referenceNumerical": null,
-    "confirmedAt": null
-  },
-  "errorCode": "INSUFFICIENT_FUNDS",
-  "errorMessage": "Conta sem saldo suficiente",
-  "metadata": {}
+  "event": "transaction.cash_out.settled",
+  "transactionId": "1a3f9e8d-2c47-4b9c-aa18-77a2b3c4d5e6",
+  "amount": 15000,
+  "currency": "MXN",
+  "status": "LIQUIDATED",
+  "destinationClabe": "012180001234567890",
+  "sourceClabe": null,
+  "reference": "9876543",
+  "voucher": "CEP20260326G7H8I9",
+  "occurredAt": "2026-03-26T10:00:00.000Z"
 }
 ```
 
-Notas:
+## Exemplo: webhook de rejeição
 
-- Em `status: FAILED`, `referenceNumerical` e `confirmedAt` são `null` — a rede SPEI nunca confirmou a transação.
-- `errorCode` e `errorMessage` descrevem o motivo da falha.
+Cenário `insufficient_funds` — o webhook `cash_out` recebe:
+
+```json
+{
+  "event": "transaction.cash_out.rejected",
+  "transactionId": "2b4c8d9e-3f56-4a1b-bc29-88a3b4c5d6f7",
+  "amount": 15000,
+  "currency": "MXN",
+  "status": "REJECTED",
+  "destinationClabe": "012180001234567890",
+  "sourceClabe": null,
+  "reference": null,
+  "voucher": null,
+  "occurredAt": "2026-03-26T10:01:00.000Z"
+}
+```
+
+Em `status: REJECTED`, os campos de comprovante (`reference`, `voucher`) vêm `null` — a rede SPEI nunca confirmou a transação. O formato completo do payload está em [Visão Geral de Webhooks](/pt-br/guides/webhooks/overview).
 
 ## Restrições
 
@@ -129,7 +112,7 @@ Notas:
 
 ## Boas práticas
 
-1. **Teste todos os cenários** antes de ir ao ar — implemente o tratamento de `CONFIRMED`, `PENDING`, `FAILED` e `EXPIRED`.
-2. **Valide os campos de erro** — use `errorCode` para decisões automáticas; reserve `errorMessage` para logs/usuários.
-3. **Teste com delay** — verifique que seu sistema lida bem com entrega lenta do webhook.
-4. **Idempotência** — use `transaction.id` como chave de idempotência; o mesmo webhook pode ser reenviado.
+1. **Teste todos os cenários** antes de ir ao ar — implemente o tratamento dos quatro status (`LIQUIDATED`, `PENDING`, `REJECTED`, `RETURNED`).
+2. **Roteie pelo campo `event`** — `*.settled`, `*.rejected` e `*.returned` exigem ações diferentes no seu sistema.
+3. **Teste com delay** — use `pending_long` para verificar que seu sistema lida bem com liquidação lenta.
+4. **Idempotência** — deduplique pelo header `x-event-id`; o mesmo evento pode ser reentregue.

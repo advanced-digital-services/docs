@@ -1,58 +1,64 @@
 ---
-title: 'Webhooks'
-description: 'Cómo el sandbox entrega webhooks y cómo probar dedupe, retries y firma.'
+title: 'Webhooks simulados'
+description: 'Cómo disparar cada evento en el sandbox y validar dedupe, retry y firma.'
 mode: 'wide'
 ---
 
 ## Cómo funciona
 
-El sandbox usa el **mismo motor de outbox** que producción. Eso significa:
+El sandbox usa el **mismo motor de entrega** que producción:
 
-- Misma estructura de payload
-- Mismos headers (`X-NTXPay-Delivery`, `X-NTXPay-Signature`, etc.)
-- Misma política de retry exponencial
+- Misma estructura de payload — consulta el [contrato completo](/es/guides/webhooks/overview)
+- Mismos headers (`x-event-id`, `X-NTXPay-Signature`)
+- Misma política de retry (5 intentos, backoff exponencial, timeout 10s)
 - Mismo formato de firma HMAC
 
-La única diferencia es la **velocidad**: los webhooks de sandbox son disparados ~1 segundo después de la request (vs. minutos en producción), y puedes forzar atrasos artificiales vía el escenario `delayed:`.
+La diferencia es el **origen**: en lugar de esperar la liquidación real en la red SPEI, el simulador resuelve la transacción en segundos — y tú controlas el desenlace vía [escenarios](/es/sandbox/scenarios).
 
-## Registrar URL
+La [configuración del webhook](/es/guides/webhooks/setup) es idéntica a la de producción — registra la URL vía `POST /api/webhooks-config` normalmente.
+
+## Dos formas de disparar un webhook
+
+### 1. Webhook de prueba (sin transacción)
+
+La forma más rápida de validar tu endpoint — dispara una entrega firmada sin mover nada:
 
 ```bash
-curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
+curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config/test \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "url": "https://mi-servidor.com/webhooks/ntxpay",
-    "events": ["cash_in"]
+    "eventType": "cash_in",
+    "status": "LIQUIDATED"
   }'
 ```
 
-### Response (201)
+La respuesta te informa al instante si tu endpoint respondió `2xx`, el tiempo de respuesta y la firma enviada. Varía el `status` (`LIQUIDATED`, `PENDING`, `REJECTED`, `RETURNED`) para ejercitar cada camino del handler. Detalles de los campos en [Configuración](/es/guides/webhooks/setup#webhook-de-prueba).
 
-```json
-{
-  "id": "wh_550e8400",
-  "url": "https://mi-servidor.com/webhooks/ntxpay",
-  "events": ["cash_in"],
-  "secret": "whsec_a1b2c3d4...",
-  "createdAt": "2026-03-26T09:00:00.000Z"
-}
-```
+### 2. Transacción simulada (flujo completo)
 
-Guarda el `secret` devuelto — se usa para verificar la firma HMAC. **Solo se muestra una vez.**
+Crea un [cash-in](/es/guides/spei-cash-in) o [cash-out](/es/guides/spei-cash-out) con el header `X-Sandbox-Scenario` — corre el pipeline entero (saldo, tarifa, estado de cuenta) y el webhook llega en segundos con el desenlace elegido:
 
-## Eventos disponibles
+| Para recibir | Usa el escenario | En el webhook tipo |
+|---|---|---|
+| `*.settled` (`LIQUIDATED`) | `success` (o ningún header) | `cash_in` / `cash_out` |
+| `*.settled` con retraso de ~30s | `pending_long` | `cash_in` / `cash_out` |
+| `*.rejected` (`REJECTED`) | `rejected` o `insufficient_funds` | `cash_in` / `cash_out` |
+| `*.returned` (`RETURNED`) | `returned` o `bad_clabe` | `refund_in` / `refund_out` |
 
-| Evento | Disparado cuando |
-|---|---|
-| `cash_in` | CLABE desechable recibe una transferencia (simulada) |
-| `cash_out` | Envío SPEI se resuelve (confirmado o falló) |
-| `refund_in` | Refund de cash-in se procesa |
-| `refund_out` | Refund de cash-out se procesa |
+Consulta el [catálogo completo de escenarios](/es/sandbox/scenarios).
 
-## Verificar la firma
+## Probar el dedupe
 
-Cada webhook llega con el header `X-NTXPay-Signature` en el formato `sha256=<hex>`:
+Cada entrega lleva un `x-event-id` único. Para probar tu dedupe:
+
+1. Configura tu handler para devolver `500` en el primer intento.
+2. NTX Pay entregará el mismo mensaje de nuevo (con el **mismo** `x-event-id`).
+3. Confirma que tu sistema ignora el duplicado y responde `200` en el segundo intento.
+
+## Probar la firma
+
+Apunta un webhook de prueba a tu endpoint y valida el `X-NTXPay-Signature` con el `secret` devuelto en la creación:
 
 ```python
 import hmac
@@ -67,45 +73,11 @@ def verify(payload_bytes: bytes, signature_header: str, secret: str) -> bool:
     return hmac.compare_digest(expected, signature_header)
 ```
 
-## Probar dedupe
-
-Cada entrega tiene un `deliveryId` único en el header `X-NTXPay-Delivery` y dentro del payload. Para probar tu dedupe:
-
-1. Configura tu handler para retornar `500` en el primer intento.
-2. NTX Pay entregará el mismo mensaje nuevamente (con el **mismo** `deliveryId`).
-3. Confirma que tu sistema ignora la duplicada y responde `200` en el segundo intento.
-
-## Política de retry
-
-| Intento | Atraso tras el anterior |
-|---|---|
-| 1 | inmediato |
-| 2 | 30s |
-| 3 | 2min |
-| 4 | 10min |
-| 5 | 1h |
-| 6 | 6h |
-| 7+ | abandonado |
-
-Tu endpoint necesita responder `2xx` en hasta **5 segundos** — cualquier `5xx`, timeout o error de conexión dispara retry.
-
-## Escenarios de prueba
-
-Fuerza que el webhook salga como `FAILED` o con delay:
-
-```bash
-curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "X-Sandbox-Scenario: pending_long" \
-  -H "Content-Type: application/json" \
-  -d '{ ... }'
-```
-
-Mira [Escenarios](/es/sandbox/scenarios) para el catálogo completo.
+Handlers completos en Node.js, Python, Java y Go: [Implementación](/es/guides/webhooks/implementation).
 
 ## Buenas prácticas
 
-1. **Responde 200 antes de procesar** — encola el evento en background; cinco segundos es el tope.
-2. **Usa `deliveryId` para dedupe** — no confíes en `transaction.id` (los retries llegan con el mismo `transaction.id` pero `deliveryId` nuevo en caso de redrive manual).
-3. **No dependas del orden** — los webhooks pueden llegar fuera de orden tras retries.
-4. **Valida siempre la firma** — incluso en sandbox.
+1. **Valida la firma** — siempre, incluso en sandbox.
+2. **Usa `x-event-id` para el dedupe** — el mismo evento puede reentregarse.
+3. **No dependas del orden** — los webhooks pueden llegar fuera de orden después de retries.
+4. **Ejercita los cuatro status** antes de ir a producción — el sandbox existe para eso.

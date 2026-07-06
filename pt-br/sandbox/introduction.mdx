@@ -1,20 +1,24 @@
 ---
 title: 'Sandbox NTX Pay'
-description: 'Ambiente de teste com alta fidelidade ao pipeline de produção do NTX Pay México.'
+description: 'Ambiente de teste com alta fidelidade ao comportamento de produção.'
 mode: 'wide'
 ---
 
 ## O que é
 
-O sandbox NTX Pay permite que sua integração exercite **cash-in**, **cash-out**, **refund** e **webhooks** sem mover dinheiro real. Diferente de mocks simplistas, o pipeline contábil completo (saldo TigerBeetle, validação de limites, cobrança de tarifas, geração de extratos, entrega de webhooks via outbox) é exercitado intacto. Apenas a liquidação na rede SPEI é simulada.
+O sandbox NTX Pay permite que sua integração exercite **cash-in**, **cash-out**, **devoluções** e **webhooks** sem mover dinheiro real. O pipeline completo é exercitado — saldo, validação de limites, cobrança de tarifas, extrato e entrega de webhooks — apenas a liquidação na rede SPEI é simulada.
 
 <Info>
-  Toda integração com a NTX Pay começa pelo sandbox. Os endpoints, payloads e webhooks descritos nesta documentação são os definitivos — quando produção for liberada para a sua empresa, o mesmo código funcionará apenas trocando as credenciais.
+  **A integração não muda.** Os endpoints, payloads e webhooks são exatamente os descritos nos [guias](/pt-br/guides/get-started) — quando produção for liberada para a sua empresa, o mesmo código funcionará apenas trocando as credenciais. Por isso, esta seção documenta somente **o que é diferente no sandbox**: os [cenários de teste](/pt-br/sandbox/scenarios) e os [webhooks simulados](/pt-br/sandbox/webhooks).
 </Info>
 
 ## Como ativar
 
 Suas credenciais de API são as **mesmas estruturalmente** que você usaria em produção. A diferença vive na conta: contas sandbox roteiam as chamadas SPEI para o simulador interno da NTX Pay. Para criar uma conta sandbox, peça ao seu Account Manager ou escreva para `contact@ntxpay.com` — o onboarding é instantâneo e o KYC é auto-aprovado.
+
+<Warning>
+  As credenciais de sandbox são **distintas** das de produção. Credenciais de produção contra o host de sandbox retornam `401`. A [autenticação](/pt-br/guides/authentication) em si é idêntica.
+</Warning>
 
 ## Base URL
 
@@ -22,15 +26,7 @@ Suas credenciais de API são as **mesmas estruturalmente** que você usaria em p
 |---|---|
 | Sandbox | `https://sandbox.mx.ntxpay.com` |
 
-Todas as rotas documentadas (`/api/auth/token`, `/api/spei/cash-in`, `/api/spei/cash-out`, `/api/transactions`, `/api/webhooks-config`) estão disponíveis exatamente neste host.
-
-## Cenários de teste
-
-Você controla o comportamento de cada chamada via header HTTP `X-Sandbox-Scenario`. Sem o header, o sandbox retorna **sucesso** por padrão. Veja [Cenários](/pt-br/sandbox/scenarios) para a lista completa de cenários de erro, sucesso e atraso suportados.
-
-## Webhooks
-
-Registre seu `webhookUrl` na conta sandbox exatamente como faria em produção — via `POST /api/webhooks-config`. Os eventos são entregues pelo mesmo motor de outbox que usamos em prod, com as mesmas assinaturas, headers (`X-NTXPay-Delivery`) e política de retry.
+Todas as rotas documentadas (`/api/auth/token`, `/api/spei/cash-in`, `/api/spei/cash-out`, `/api/balance`, `/api/webhooks-config`) estão disponíveis exatamente neste host.
 
 ## Diferenças vs Produção
 
@@ -38,27 +34,26 @@ Registre seu `webhookUrl` na conta sandbox exatamente como faria em produção �
 |---|---|---|
 | Base URL | `https://sandbox.mx.ntxpay.com` | Fornecida no onboarding |
 | Saldo | Simulado | Fundos reais |
-| Confirmação SPEI cash-in | Imediata (~1s) | Real (segundos a minutos) |
-| `X-Sandbox-Scenario` | Suportado | Rejeitado com `400` |
+| Liquidação SPEI | Simulada, em segundos | Real (segundos a minutos) |
+| Header `X-Sandbox-Scenario` | Suportado | Rejeitado com `400` |
 | Custo | Gratuito | Conforme contrato |
+
+## Fluxo de teste sugerido
+
+1. **Autentique** — [obtenha o JWT](/pt-br/guides/authentication) com as credenciais sandbox.
+2. **Registre seu webhook** — via [`POST /api/webhooks-config`](/pt-br/guides/webhooks/setup), exatamente como em produção.
+3. **Crie um cash-in** — siga o [guia de cash-in](/pt-br/guides/spei-cash-in); a confirmação chega simulada em segundos.
+4. **Envie um cash-out** — com o saldo do passo anterior, siga o [guia de cash-out](/pt-br/guides/spei-cash-out).
+5. **Force erros e devoluções** — use os [cenários](/pt-br/sandbox/scenarios) para exercitar todos os caminhos do seu handler.
 
 ## Próximos passos
 
 <CardGroup cols={2}>
-  <Card title="Autenticação" href="/pt-br/sandbox/authentication">
-    Como obter o JWT no sandbox usando suas credenciais.
+  <Card title="Cenários de teste" href="/pt-br/sandbox/scenarios">
+    Force sucesso, falha, devolução e atraso via header `X-Sandbox-Scenario`.
   </Card>
-  <Card title="Cenários" href="/pt-br/sandbox/scenarios">
-    Lista completa de cenários disponíveis via `X-Sandbox-Scenario`.
-  </Card>
-  <Card title="Cash-in" href="/pt-br/sandbox/cash-in">
-    Receber via SPEI no sandbox.
-  </Card>
-  <Card title="Cash-out" href="/pt-br/sandbox/cash-out">
-    Enviar via SPEI no sandbox.
-  </Card>
-  <Card title="Webhooks" href="/pt-br/sandbox/webhooks">
-    Como o sandbox entrega webhooks e como testar dedupe.
+  <Card title="Webhooks simulados" href="/pt-br/sandbox/webhooks">
+    Como disparar cada evento e validar dedupe, retry e assinatura.
   </Card>
 </CardGroup>
 

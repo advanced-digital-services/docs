@@ -1,15 +1,16 @@
 ---
-title: 'Setup de Webhooks'
-description: 'Configure URLs de webhook programaticamente para SPEI'
+title: 'Configuração de Webhooks'
+description: 'Registre, teste, liste e remova URLs de webhook programaticamente'
 mode: 'wide'
 ---
 
 ## Visão Geral
 
-A configuração de webhooks é feita via três endpoints:
+A configuração de webhooks é feita via quatro endpoints:
 
 - `GET /api/webhooks-config` — listar webhooks ativos
 - `POST /api/webhooks-config` — criar/configurar um webhook
+- `POST /api/webhooks-config/test` — disparar um webhook de teste assinado
 - `DELETE /api/webhooks-config/{id}` — remover um webhook
 
 ## Criar Webhook
@@ -50,12 +51,56 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config \
 </ParamField>
 
 <ParamField path="events" type="array" required>
-  Um webhook assina **exatamente UM** evento — o array deve conter um único item. Valores aceitos: `cash_in`, `cash_out`, `refund_in`, `refund_out`, `internal_transfer`. Para receber mais de um tipo de evento, crie um webhook por evento.
+  Um webhook assina **exatamente UM** evento — o array deve conter um único item. Valores aceitos: `cash_in`, `cash_out`, `refund_in`, `refund_out`, `all` (Geral — recebe todos os eventos) e `internal_transfer`. Veja a semântica de cada tipo na [Visão Geral](/pt-br/guides/webhooks/overview).
 </ParamField>
 
 <ParamField path="secret" type="string">
   Secret HMAC para validar assinatura. Mínimo 8 caracteres, máximo 128. Se omitido, o NTX Pay gera.
 </ParamField>
+
+## Webhook de Teste
+
+Depois de criar o webhook, dispare uma entrega de teste **assinada com o mesmo secret** — sem precisar movimentar uma transação:
+
+```bash
+curl -X POST https://sandbox.mx.ntxpay.com/api/webhooks-config/test \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "eventType": "cash_in",
+    "status": "LIQUIDATED"
+  }'
+```
+
+```json
+{
+  "delivered": true,
+  "url": "https://meu-servidor.com/webhooks/ntxpay",
+  "eventId": "8e2c5b6f-3a12-4b9c-9a18-77a2b3c4d5e6",
+  "status": "LIQUIDATED",
+  "signed": true,
+  "statusCode": 200,
+  "timeMs": 184
+}
+```
+
+<ParamField path="eventType" type="string" required>
+  Qual webhook recebe o teste: `cash_in`, `cash_out`, `refund_in`, `refund_out` ou `internal_transfer`.
+</ParamField>
+
+<ParamField path="status" type="string">
+  Status simulado no payload: `LIQUIDATED` (default), `PENDING`, `REJECTED` ou `RETURNED`.
+</ParamField>
+
+<ParamField path="overrideUrl" type="string">
+  URL temporária de teste (ex.: webhook.site). Se omitida, entrega na URL configurada.
+</ParamField>
+
+<ParamField path="amountCentavos" type="integer">
+  Valor em centavos no payload de teste (default `1000` = $10,00 MXN).
+</ParamField>
+
+`delivered: true` significa que o seu endpoint respondeu `2xx`. `statusCode: 0` indica erro de conexão.
 
 ## Listar Webhooks
 
@@ -100,22 +145,21 @@ curl -X DELETE https://sandbox.mx.ntxpay.com/api/webhooks-config/42 \
 
 ## Múltiplos Webhooks
 
-Cada webhook assina exatamente um evento, então configure **um webhook por tipo de evento** que deseja receber (ex.: um para `cash_in`, outro para `cash_out`). Útil para:
+Cada webhook assina exatamente um evento, então você tem duas estratégias:
 
-- Rotear cada tipo de evento para seu próprio endpoint/handler
-- Múltiplos serviços consumindo eventos diferentes
-- Ambientes internos distintos (ex.: dev vs homologação interna)
+- **Um webhook por tipo** (ex.: um para `cash_in`, outro para `cash_out`) — roteia cada tipo para seu próprio endpoint/handler.
+- **Um webhook `all`** — uma URL única recebe tudo e o seu handler roteia pelo campo `event` do payload.
 
-## Testando o Endpoint
+## Validando o Endpoint
 
-Antes de liberar o webhook para receber tráfego de verdade, valide seu endpoint:
+Antes de liberar o webhook para receber tráfego de verdade:
 
-1. Use [webhook.site](https://webhook.site) ou [ngrok](https://ngrok.com) para inspecionar o tráfego
-2. Dispare cobranças com `X-Sandbox-Scenario` (veja [Cenários de Sandbox](/pt-br/sandbox/scenarios))
+1. Use [webhook.site](https://webhook.site) ou [ngrok](https://ngrok.com) para inspecionar o tráfego (o campo `overrideUrl` do webhook de teste aceita essas URLs)
+2. Dispare entregas com `POST /api/webhooks-config/test` variando o `status`
 3. Confira que sua aplicação:
    - Valida `X-NTXPay-Signature` corretamente
    - Retorna `200` em menos de 10 segundos
-   - Deduplica por `X-NTXPay-Delivery`
+   - Deduplica por `x-event-id`
 
 ## Próximos Passos
 

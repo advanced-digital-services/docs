@@ -54,15 +54,12 @@
                 "group": "Sandbox",
                 "pages": [
                   "es/sandbox/introduction",
-                  "es/sandbox/authentication",
                   "es/sandbox/scenarios",
-                  "es/sandbox/cash-in",
-                  "es/sandbox/cash-out",
                   "es/sandbox/webhooks"
                 ]
               },
               {
-                "group": "Eventos de Webhook",
+                "group": "Webhooks",
                 "pages": [
                   "es/guides/webhooks/overview",
                   "es/guides/webhooks/setup",
@@ -91,6 +88,7 @@
                 "pages": [
                   "es/endpoints/webhooks-config-list",
                   "es/endpoints/webhooks-config-setup",
+                  "es/endpoints/webhooks-config-test",
                   "es/endpoints/webhooks-config-delete"
                 ]
               }
@@ -119,15 +117,12 @@
                 "group": "Sandbox",
                 "pages": [
                   "en/sandbox/introduction",
-                  "en/sandbox/authentication",
                   "en/sandbox/scenarios",
-                  "en/sandbox/cash-in",
-                  "en/sandbox/cash-out",
                   "en/sandbox/webhooks"
                 ]
               },
               {
-                "group": "Webhook Events",
+                "group": "Webhooks",
                 "pages": [
                   "en/guides/webhooks/overview",
                   "en/guides/webhooks/setup",
@@ -156,6 +151,7 @@
                 "pages": [
                   "en/endpoints/webhooks-config-list",
                   "en/endpoints/webhooks-config-setup",
+                  "en/endpoints/webhooks-config-test",
                   "en/endpoints/webhooks-config-delete"
                 ]
               }
@@ -185,15 +181,12 @@
                 "group": "Sandbox",
                 "pages": [
                   "pt-br/sandbox/introduction",
-                  "pt-br/sandbox/authentication",
                   "pt-br/sandbox/scenarios",
-                  "pt-br/sandbox/cash-in",
-                  "pt-br/sandbox/cash-out",
                   "pt-br/sandbox/webhooks"
                 ]
               },
               {
-                "group": "Eventos de Webhook",
+                "group": "Webhooks",
                 "pages": [
                   "pt-br/guides/webhooks/overview",
                   "pt-br/guides/webhooks/setup",
@@ -222,6 +215,7 @@
                 "pages": [
                   "pt-br/endpoints/webhooks-config-list",
                   "pt-br/endpoints/webhooks-config-setup",
+                  "pt-br/endpoints/webhooks-config-test",
                   "pt-br/endpoints/webhooks-config-delete"
                 ]
               }

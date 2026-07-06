@@ -5,10 +5,10 @@ description: 'Saldo disponible y pendiente de la cuenta en centavos MXN'
 
 ## Visión General
 
-El endpoint `GET /api/balance` retorna el saldo de la cuenta autenticada en **centavos MXN** (enteros). Hay dos campos:
+El endpoint `GET /api/balance` devuelve el saldo de la cuenta autenticada en **centavos MXN** (enteros). Hay dos campos:
 
-- **`availableCentavos`** — saldo disponible para enviar SPEI cash-out
-- **`pendingCentavos`** — saldo bloqueado (cash-out en procesamiento, cash-in confirmando)
+- **`availableCentavos`** — saldo disponible para enviar cash-out SPEI
+- **`pendingCentavos`** — saldo bloqueado (cash-out en procesamiento, cash-in en confirmación)
 
 ## Endpoint
 
@@ -37,23 +37,23 @@ curl -X GET https://sandbox.mx.ntxpay.com/api/balance \
 }
 ```
 
-`4873490` centavos = **$48 734.90 MXN**.
+`4873490` centavos = **$48,734.90 MXN**.
 
 ## Estructura de la Respuesta
 
 <ResponseField name="availableCentavos" type="integer">
-  Saldo disponible en centavos MXN. Úsalo para validar antes de un cash-out.
+  Saldo disponible en centavos MXN. Usa este valor para validar antes de un cash-out.
 </ResponseField>
 
 <ResponseField name="pendingCentavos" type="integer">
-  Saldo pendiente en centavos MXN. Incluye cash-out en procesamiento y cash-in aguardando confirmación final de la liquidación.
+  Saldo pendiente en centavos MXN. Incluye cash-out en procesamiento y cash-in en espera de la confirmación final de la liquidación.
 </ResponseField>
 
 <ResponseField name="currency" type="string">
-  Siempre `MXN` en el scope México.
+  Siempre `MXN` en el ámbito México.
 </ResponseField>
 
-## Ejemplo Node.js
+## Ejemplo en Node.js
 
 ```typescript
 import axios from 'axios';
@@ -66,13 +66,13 @@ async function getBalance(token: string) {
   const availableMXN = (data.availableCentavos / 100).toFixed(2);
   const pendingMXN = (data.pendingCentavos / 100).toFixed(2);
 
-  console.log(`Disponible: $${availableMXN} MXN`);
-  console.log(`Pendiente:  $${pendingMXN} MXN`);
+  console.log(`Available: $${availableMXN} MXN`);
+  console.log(`Pending:   $${pendingMXN} MXN`);
   return data;
 }
 ```
 
-## Validación Antes de Cash-Out
+## Validación Antes del Cash-Out
 
 ```typescript
 async function safeSpeiCashOut(amountCentavos: number, token: string, dto: any) {
@@ -80,8 +80,8 @@ async function safeSpeiCashOut(amountCentavos: number, token: string, dto: any) 
 
   if (balance.availableCentavos < amountCentavos) {
     throw new Error(
-      `Saldo insuficiente: disponible ${balance.availableCentavos}, ` +
-      `solicitado ${amountCentavos} (en centavos)`,
+      `Insufficient balance: available ${balance.availableCentavos}, ` +
+      `requested ${amountCentavos} (in centavos)`,
     );
   }
 
@@ -92,7 +92,7 @@ async function safeSpeiCashOut(amountCentavos: number, token: string, dto: any) 
 ```
 
 <Info>
-  Aún validando el saldo antes, el cash-out puede fallar con `400` si otro cash-out simultáneo consume el saldo. Trata el error `400` como "saldo insuficiente" en el momento de la llamada.
+  Aun validando el saldo antes, el cash-out puede fallar con `400` si otro cash-out concurrente consume el saldo. Trata el error `400` como "saldo insuficiente" en el momento de la llamada.
 </Info>
 
 ## Códigos de Respuesta
@@ -101,7 +101,7 @@ async function safeSpeiCashOut(amountCentavos: number, token: string, dto: any) 
 |---|---|
 | `200` | Saldo consultado |
 | `401` | Token inválido o ausente |
-| `502` | `account-ms` no disponible |
+| `502` | Servicio temporalmente no disponible — intenta de nuevo |
 
 ## Próximos Pasos
 

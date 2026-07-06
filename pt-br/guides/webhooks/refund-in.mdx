@@ -1,225 +1,56 @@
 ---
-title: 'Evento refund_in'
-description: 'Notificação de estorno recebido — uma transferência cash-out sua foi devolvida'
+title: 'Webhook refund_in'
+description: 'Devolução de um cash-in — um pagamento recebido foi estornado ao pagador'
 mode: 'wide'
 ---
 
 ## Quando dispara
 
-O evento `refund_in` é disparado quando uma transação **cash-out enviada por você** é devolvida pela contraparte. O saldo correspondente é creditado de volta na sua conta.
+O webhook do tipo `refund_in` recebe o evento `transaction.cash_in.returned`: um **cash-in que você recebeu foi devolvido ao pagador**. O saldo correspondente é debitado da sua conta.
 
 Cenários comuns:
 
-- Beneficiário rejeitou a transferência manualmente
-- CLABE existia mas conta foi encerrada após a confirmação inicial
-- Estorno solicitado pelo beneficiário dentro do prazo SPEI
+- Estorno por motivo de fraude ou erro
+- Devolução dentro do prazo da rede SPEI
 
 ## Payload
 
 ```json
 {
-  "event": "refund_in",
-  "deliveryId": "5b9c2d8e-4f12-4a18-bb29-88a3b4c5d6f7",
-  "createdAt": "2026-05-14T09:15:00.000Z",
-  "transaction": {
-    "id": 67890,
-    "externalId": "payout-001-refund",
-    "paymentMethod": "SPEI",
-    "direction": "in",
-    "type": "refund_in",
-    "status": "CONFIRMED",
-    "amountCentavos": 50000,
-    "clabe": "012180001234567890",
-    "createdAt": "2026-05-14T09:14:50.000Z",
-    "confirmedAt": "2026-05-14T09:15:00.000Z"
-  },
-  "originalTransactionId": 56789
+  "event": "transaction.cash_in.returned",
+  "transactionId": "8e2c5b6f-3a12-4b9c-9a18-77a2b3c4d5e6",
+  "amount": 50000,
+  "currency": "MXN",
+  "status": "RETURNED",
+  "destinationClabe": "012180001234567890",
+  "sourceClabe": "646180123456789012",
+  "reference": "1234567",
+  "voucher": null,
+  "occurredAt": "2026-05-14T11:45:00.000Z"
 }
 ```
 
-O campo `originalTransactionId` aponta para o `id` do cash-out original que foi estornado. Use para correlacionar.
+O `transactionId` é o **mesmo** do cash-in original — use-o para localizar o pedido e marcá-lo como estornado.
+
+## Headers
+
+| Header | Valor |
+|---|---|
+| `x-event-id` | UUID único do evento (use para dedupe) |
+| `X-NTXPay-Signature` | `sha256=<hmac>` do corpo bruto |
 
 ## Resposta Esperada
 
-`HTTP 200 OK` em até 10 segundos.
+`200 OK` em até 10 segundos.
 
-## Exemplos de Handler
+## Processamento
 
-<CodeGroup>
-
-```typescript Node.js
-import express from 'express';
-import crypto from 'crypto';
-
-const app = express();
-app.use(express.raw({ type: 'application/json' })); // raw body for HMAC
-
-const SECRET = process.env.NTXPAY_WEBHOOK_SECRET!;
-
-app.post('/webhooks/ntxpay', (req, res) => {
-  const sig = req.header('X-NTXPay-Signature') ?? '';
-  const expected = 'sha256=' + crypto
-    .createHmac('sha256', SECRET)
-    .update(req.body)
-    .digest('hex');
-
-  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
-    return res.status(401).end();
-  }
-
-  const event = JSON.parse(req.body.toString());
-  if (event.event === 'refund_in') {
-    // Balance credit already happened automatically
-    markPayoutAsRefunded({
-      originalId: event.originalTransactionId,
-      refundId: event.transaction.id,
-      amount: event.transaction.amountCentavos,
-    });
-  }
-
-  res.json({ received: true });
-});
-```
-
-```python Python
-import hmac
-import hashlib
-import json
-import os
-from flask import Flask, request, abort, jsonify
-
-app = Flask(__name__)
-SECRET = os.environ["NTXPAY_WEBHOOK_SECRET"].encode()
-
-@app.post("/webhooks/ntxpay")
-def webhook():
-    raw = request.get_data()  # raw bytes — required for HMAC
-    sig = request.headers.get("X-NTXPay-Signature", "")
-    expected = "sha256=" + hmac.new(SECRET, raw, hashlib.sha256).hexdigest()
-
-    if not hmac.compare_digest(sig, expected):
-        abort(401)
-
-    event = json.loads(raw)
-    if event["event"] == "refund_in":
-        # Balance credit already happened automatically
-        mark_payout_as_refunded(
-            original_id=event["originalTransactionId"],
-            refund_id=event["transaction"]["id"],
-            amount=event["transaction"]["amountCentavos"],
-        )
-
-    return jsonify(received=True)
-```
-
-```java Java
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.security.MessageDigest;
-import java.util.Map;
-
-@RestController
-public class NtxPayRefundInHandler {
-    private static final byte[] SECRET =
-        System.getenv("NTXPAY_WEBHOOK_SECRET").getBytes();
-    private final ObjectMapper mapper = new ObjectMapper();
-
-    @PostMapping(value = "/webhooks/ntxpay", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> handle(
-        @RequestHeader("X-NTXPay-Signature") String sig,
-        @RequestBody byte[] raw
-    ) throws Exception {
-        String expected = "sha256=" + hmacSha256Hex(SECRET, raw);
-        if (!MessageDigest.isEqual(sig.getBytes(), expected.getBytes())) {
-            return ResponseEntity.status(401).build();
-        }
-
-        Map<String, Object> event = mapper.readValue(raw, new TypeReference<>() {});
-        if ("refund_in".equals(event.get("event"))) {
-            Map<String, Object> tx = (Map<String, Object>) event.get("transaction");
-            // Balance credit already happened automatically
-            markPayoutAsRefunded(
-                ((Number) event.get("originalTransactionId")).longValue(),
-                ((Number) tx.get("id")).longValue(),
-                ((Number) tx.get("amountCentavos")).longValue()
-            );
-        }
-
-        return ResponseEntity.ok(Map.of("received", true));
-    }
-
-    private static String hmacSha256Hex(byte[] secret, byte[] data) throws Exception {
-        Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(secret, "HmacSHA256"));
-        byte[] result = mac.doFinal(data);
-        StringBuilder sb = new StringBuilder(result.length * 2);
-        for (byte b : result) sb.append(String.format("%02x", b));
-        return sb.toString();
-    }
+```typescript
+const event = JSON.parse(rawBody.toString());
+if (event.event === 'transaction.cash_in.returned') {
+  // O débito do saldo já aconteceu automaticamente
+  await markOrderRefunded(event.transactionId, event.amount);
 }
 ```
 
-```go Go
-package main
-
-import (
-    "crypto/hmac"
-    "crypto/sha256"
-    "encoding/hex"
-    "encoding/json"
-    "io"
-    "net/http"
-    "os"
-)
-
-var secret = []byte(os.Getenv("NTXPAY_WEBHOOK_SECRET"))
-
-type refundInEvent struct {
-    Event                 string `json:"event"`
-    OriginalTransactionID int64  `json:"originalTransactionId"`
-    Transaction           struct {
-        ID             int64 `json:"id"`
-        AmountCentavos int64 `json:"amountCentavos"`
-    } `json:"transaction"`
-}
-
-func handleRefundIn(w http.ResponseWriter, r *http.Request) {
-    raw, _ := io.ReadAll(r.Body)
-
-    sig := r.Header.Get("X-NTXPay-Signature")
-    h := hmac.New(sha256.New, secret)
-    h.Write(raw)
-    expected := "sha256=" + hex.EncodeToString(h.Sum(nil))
-
-    if !hmac.Equal([]byte(sig), []byte(expected)) {
-        w.WriteHeader(http.StatusUnauthorized)
-        return
-    }
-
-    var event refundInEvent
-    if err := json.Unmarshal(raw, &event); err == nil && event.Event == "refund_in" {
-        // Balance credit already happened automatically
-        markPayoutAsRefunded(
-            event.OriginalTransactionID,
-            event.Transaction.ID,
-            event.Transaction.AmountCentavos,
-        )
-    }
-
-    _ = json.NewEncoder(w).Encode(map[string]bool{"received": true})
-}
-
-func main() {
-    http.HandleFunc("/webhooks/ntxpay", handleRefundIn)
-    _ = http.ListenAndServe(":8080", nil)
-}
-```
-
-</CodeGroup>
-
+Para o handler completo com validação HMAC e dedupe em Node.js, Python, Java e Go, veja [Implementação](/pt-br/guides/webhooks/implementation).

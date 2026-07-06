@@ -10,7 +10,7 @@ Toda implementação de webhook precisa cobrir 3 coisas:
 
 1. **Validação HMAC** com o `secret` recebido na criação do webhook
 2. **Resposta rápida** (`200 OK` em ≤10s)
-3. **Idempotência** via `X-NTXPay-Delivery` ou `transaction.id`
+3. **Idempotência** via header `x-event-id`
 
 ## Exemplos de Código
 
@@ -30,7 +30,7 @@ const seen = new Set<string>(); // production: Redis with TTL
 
 app.post('/webhooks/ntxpay', async (req, res) => {
   const sig = req.header('X-NTXPay-Signature') ?? '';
-  const deliveryId = req.header('X-NTXPay-Delivery') ?? '';
+  const eventId = req.header('x-event-id') ?? '';
 
   const expected = 'sha256=' + crypto
     .createHmac('sha256', SECRET)
@@ -43,8 +43,8 @@ app.post('/webhooks/ntxpay', async (req, res) => {
   }
 
   // Dedupe
-  if (seen.has(deliveryId)) return res.json({ duplicate: true });
-  seen.add(deliveryId);
+  if (seen.has(eventId)) return res.json({ duplicate: true });
+  seen.add(eventId);
 
   const event = JSON.parse(req.body.toString());
 
@@ -68,15 +68,15 @@ seen = set()  # production: Redis with TTL
 def webhook():
     raw = request.get_data()  # raw bytes — essential so HMAC matches
     sig = request.headers.get('X-NTXPay-Signature', '')
-    delivery_id = request.headers.get('X-NTXPay-Delivery', '')
+    event_id = request.headers.get('x-event-id', '')
 
     expected = 'sha256=' + hmac.new(SECRET, raw, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(sig, expected):
         abort(401)
 
-    if delivery_id in seen:
+    if event_id in seen:
         return jsonify(duplicate=True)
-    seen.add(delivery_id)
+    seen.add(event_id)
 
     event = request.get_json()
     # enqueue asynchronously
@@ -107,14 +107,14 @@ public class NtxPayWebhook {
     @PostMapping(value = "/webhooks/ntxpay", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> handle(
         @RequestHeader("X-NTXPay-Signature") String sig,
-        @RequestHeader("X-NTXPay-Delivery") String deliveryId,
+        @RequestHeader("x-event-id") String eventId,
         @RequestBody byte[] raw // raw bytes — essential so HMAC matches
     ) throws Exception {
         String expected = "sha256=" + hmacSha256Hex(SECRET, raw);
         if (!MessageDigest.isEqual(sig.getBytes(), expected.getBytes())) {
             return ResponseEntity.status(401).build();
         }
-        if (!seen.add(deliveryId)) {
+        if (!seen.add(eventId)) {
             return ResponseEntity.ok(Map.of("duplicate", true));
         }
 
@@ -161,7 +161,7 @@ func handleWebhook(w http.ResponseWriter, r *http.Request) {
     }
 
     sig := r.Header.Get("X-NTXPay-Signature")
-    deliveryID := r.Header.Get("X-NTXPay-Delivery")
+    eventID := r.Header.Get("x-event-id")
 
     h := hmac.New(sha256.New, secret)
     h.Write(raw)
@@ -173,12 +173,12 @@ func handleWebhook(w http.ResponseWriter, r *http.Request) {
     }
 
     seenMu.Lock()
-    if seen[deliveryID] {
+    if seen[eventID] {
         seenMu.Unlock()
         _ = json.NewEncoder(w).Encode(map[string]bool{"duplicate": true})
         return
     }
-    seen[deliveryID] = true
+    seen[eventID] = true
     seenMu.Unlock()
 
     // enqueue async processing
@@ -197,9 +197,9 @@ func main() {
 
 O HMAC é calculado sobre os **bytes exatos** que o NTX Pay enviou. Se o framework parsear o JSON antes (rearranjando espaços, reordenando campos), a assinatura não bate. Sempre capture o body bruto em **bytes** antes de fazer parse.
 
-## Eventos por Status
+## Roteando por Evento e Status
 
-Filtre antes de processar:
+O campo `event` identifica o fluxo (`transaction.cash_in.*` / `transaction.cash_out.*`) e o `status` o resultado. Filtre antes de processar:
 
 <CodeGroup>
 
@@ -207,22 +207,20 @@ Filtre antes de processar:
 const event = JSON.parse(req.body.toString());
 
 switch (event.event) {
-  case 'cash_in':
-    if (event.transaction.status === 'CONFIRMED') {
-      await markOrderPaid(event.transaction.externalId);
-    }
+  case 'transaction.cash_in.settled':
+    await markOrderPaid(event.transactionId, event.amount);
     break;
 
-  case 'cash_out':
-    if (event.transaction.status === 'CONFIRMED') {
-      await markPayoutSettled(event.transaction.id);
-    } else if (event.transaction.status === 'FAILED') {
-      await markPayoutFailed(event.transaction.id);
-    }
+  case 'transaction.cash_out.settled':
+    await markPayoutSettled(event.transactionId);
     break;
 
-  case 'refund_in':
-  case 'refund_out':
+  case 'transaction.cash_out.rejected':
+    await markPayoutFailed(event.transactionId);
+    break;
+
+  case 'transaction.cash_in.returned':
+  case 'transaction.cash_out.returned':
     await processRefund(event);
     break;
 }
@@ -230,74 +228,53 @@ switch (event.event) {
 
 ```python Python
 event = request.get_json()
-evt_type = event["event"]
-tx = event["transaction"]
-status = tx["status"]
 
-if evt_type == "cash_in":
-    if status == "CONFIRMED":
-        mark_order_paid(tx["externalId"])
-
-elif evt_type == "cash_out":
-    if status == "CONFIRMED":
-        mark_payout_settled(tx["id"])
-    elif status == "FAILED":
-        mark_payout_failed(tx["id"])
-
-elif evt_type in ("refund_in", "refund_out"):
-    process_refund(event)
+match event["event"]:
+    case "transaction.cash_in.settled":
+        mark_order_paid(event["transactionId"], event["amount"])
+    case "transaction.cash_out.settled":
+        mark_payout_settled(event["transactionId"])
+    case "transaction.cash_out.rejected":
+        mark_payout_failed(event["transactionId"])
+    case "transaction.cash_in.returned" | "transaction.cash_out.returned":
+        process_refund(event)
 ```
 
 ```java Java
 // `raw` is the request body byte[], `mapper` is a Jackson ObjectMapper
 Map<String, Object> event = mapper.readValue(raw, new TypeReference<>() {});
 String evtType = (String) event.get("event");
-Map<String, Object> tx = (Map<String, Object>) event.get("transaction");
-String status = (String) tx.get("status");
+String txId = (String) event.get("transactionId");
 
 switch (evtType) {
-    case "cash_in" -> {
-        if ("CONFIRMED".equals(status)) {
-            markOrderPaid((String) tx.get("externalId"));
-        }
-    }
-    case "cash_out" -> {
-        if ("CONFIRMED".equals(status)) {
-            markPayoutSettled(((Number) tx.get("id")).longValue());
-        } else if ("FAILED".equals(status)) {
-            markPayoutFailed(((Number) tx.get("id")).longValue());
-        }
-    }
-    case "refund_in", "refund_out" -> processRefund(event);
+    case "transaction.cash_in.settled" ->
+        markOrderPaid(txId, ((Number) event.get("amount")).longValue());
+    case "transaction.cash_out.settled" -> markPayoutSettled(txId);
+    case "transaction.cash_out.rejected" -> markPayoutFailed(txId);
+    case "transaction.cash_in.returned", "transaction.cash_out.returned" ->
+        processRefund(event);
 }
 ```
 
 ```go Go
 var event struct {
-    Event       string `json:"event"`
-    Transaction struct {
-        ID         int64  `json:"id"`
-        ExternalID string `json:"externalId"`
-        Status     string `json:"status"`
-    } `json:"transaction"`
+    Event         string `json:"event"`
+    TransactionID string `json:"transactionId"`
+    Amount        int64  `json:"amount"`
+    Status        string `json:"status"`
 }
 if err := json.Unmarshal(raw, &event); err != nil {
     return err
 }
 
 switch event.Event {
-case "cash_in":
-    if event.Transaction.Status == "CONFIRMED" {
-        markOrderPaid(event.Transaction.ExternalID)
-    }
-case "cash_out":
-    switch event.Transaction.Status {
-    case "CONFIRMED":
-        markPayoutSettled(event.Transaction.ID)
-    case "FAILED":
-        markPayoutFailed(event.Transaction.ID)
-    }
-case "refund_in", "refund_out":
+case "transaction.cash_in.settled":
+    markOrderPaid(event.TransactionID, event.Amount)
+case "transaction.cash_out.settled":
+    markPayoutSettled(event.TransactionID)
+case "transaction.cash_out.rejected":
+    markPayoutFailed(event.TransactionID)
+case "transaction.cash_in.returned", "transaction.cash_out.returned":
     processRefund(event)
 }
 ```
@@ -306,7 +283,7 @@ case "refund_in", "refund_out":
 
 ## Re-Tentativas
 
-Se você devolver status ≠ `2xx`, o NTX Pay retenta até **5 vezes** em backoff exponencial (~30s, 1m, 5m, 15m, 1h). Depois disso, o evento é descartado. Para reenviar manualmente, use o painel ou contate suporte.
+Se você devolver status ≠ `2xx` (ou estourar o timeout de 10s), o NTX Pay retenta até **5 vezes** em backoff exponencial a partir de ~5 segundos. Depois disso, a entrega é marcada como falha — o reenvio manual pode ser solicitado ao suporte.
 
 <Warning>
   Não use `429` para sinalizar rate-limit do seu próprio serviço — isso aciona retry e amplifica a carga. Responda `503 Service Unavailable` se realmente não puder processar.
@@ -317,5 +294,4 @@ Se você devolver status ≠ `2xx`, o NTX Pay retenta até **5 vezes** em backof
 - **Use Redis/banco para dedupe** com TTL ≥ 24h (não memória in-process)
 - **Processe assíncrono**: webhook handler só valida + enfileira
 - **Monitore latência** do handler — alvo P95 < 500ms
-- **Logue `X-NTXPay-Delivery`** para auditoria
-- **Re-consulte `GET /api/spei/transaction/{externalId}`** se o webhook trouxer estado conflitante com seu banco
+- **Logue `x-event-id`** para auditoria

@@ -1,224 +1,57 @@
 ---
-title: 'Evento refund_out'
-description: 'Notificação de estorno enviado — você devolveu uma transação cash-in recebida'
+title: 'Webhook refund_out'
+description: 'Devolução de um cash-out — uma transferência enviada foi devolvida pela contraparte'
 mode: 'wide'
 ---
 
 ## Quando dispara
 
-O evento `refund_out` é disparado quando um **cash-in que você recebeu é devolvido ao pagador**. O saldo correspondente é debitado da sua conta.
+O webhook do tipo `refund_out` recebe o evento `transaction.cash_out.returned`: uma **transferência que você enviou foi devolvida** pelo banco da contraparte. O saldo correspondente é creditado de volta na sua conta.
 
 Cenários comuns:
 
-- Você acionou um estorno por motivo de fraude ou erro
-- Cliente solicitou cancelamento dentro do prazo SPEI
+- CLABE de destino inválida ou conta encerrada
+- Beneficiário/banco da contraparte rejeitou a transferência após a aceitação inicial
+- Devolução dentro do prazo da rede SPEI
 
 ## Payload
 
 ```json
 {
-  "event": "refund_out",
-  "deliveryId": "7d2c9e8f-5b34-4c19-aa18-99b3c4d5e6f7",
-  "createdAt": "2026-05-14T11:45:00.000Z",
-  "transaction": {
-    "id": 78901,
-    "externalId": "order-abc-123-refund",
-    "paymentMethod": "SPEI",
-    "direction": "out",
-    "type": "refund_out",
-    "status": "CONFIRMED",
-    "amountCentavos": 50000,
-    "clabe": "012180001234567890",
-    "createdAt": "2026-05-14T11:44:50.000Z",
-    "confirmedAt": "2026-05-14T11:45:00.000Z"
-  },
-  "originalTransactionId": 12345
+  "event": "transaction.cash_out.returned",
+  "transactionId": "1a3f9e8d-2c47-4b9c-aa18-77a2b3c4d5e6",
+  "amount": 50000,
+  "currency": "MXN",
+  "status": "RETURNED",
+  "destinationClabe": "012180001234567890",
+  "sourceClabe": null,
+  "reference": "9876543",
+  "voucher": null,
+  "occurredAt": "2026-05-14T09:15:00.000Z"
 }
 ```
 
-`originalTransactionId` aponta para o `id` do cash-in original que foi devolvido.
+O `transactionId` é o **mesmo** do cash-out original — use-o para correlacionar e marcar o pagamento como devolvido.
+
+## Headers
+
+| Header | Valor |
+|---|---|
+| `x-event-id` | UUID único do evento (use para dedupe) |
+| `X-NTXPay-Signature` | `sha256=<hmac>` do corpo bruto |
 
 ## Resposta Esperada
 
-`HTTP 200 OK`.
+`200 OK` em até 10 segundos.
 
-## Exemplos de Handler
+## Processamento
 
-<CodeGroup>
-
-```typescript Node.js
-import express from 'express';
-import crypto from 'crypto';
-
-const app = express();
-app.use(express.raw({ type: 'application/json' })); // raw body for HMAC
-
-const SECRET = process.env.NTXPAY_WEBHOOK_SECRET!;
-
-app.post('/webhooks/ntxpay', (req, res) => {
-  const sig = req.header('X-NTXPay-Signature') ?? '';
-  const expected = 'sha256=' + crypto
-    .createHmac('sha256', SECRET)
-    .update(req.body)
-    .digest('hex');
-
-  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
-    return res.status(401).end();
-  }
-
-  const event = JSON.parse(req.body.toString());
-  if (event.event === 'refund_out') {
-    // Balance already debited
-    markOrderAsRefunded({
-      originalCashInId: event.originalTransactionId,
-      refundId: event.transaction.id,
-      amount: event.transaction.amountCentavos,
-    });
-  }
-
-  res.json({ received: true });
-});
-```
-
-```python Python
-import hmac
-import hashlib
-import json
-import os
-from flask import Flask, request, abort, jsonify
-
-app = Flask(__name__)
-SECRET = os.environ["NTXPAY_WEBHOOK_SECRET"].encode()
-
-@app.post("/webhooks/ntxpay")
-def webhook():
-    raw = request.get_data()  # raw bytes — required for HMAC
-    sig = request.headers.get("X-NTXPay-Signature", "")
-    expected = "sha256=" + hmac.new(SECRET, raw, hashlib.sha256).hexdigest()
-
-    if not hmac.compare_digest(sig, expected):
-        abort(401)
-
-    event = json.loads(raw)
-    if event["event"] == "refund_out":
-        # Balance already debited
-        mark_order_as_refunded(
-            original_cash_in_id=event["originalTransactionId"],
-            refund_id=event["transaction"]["id"],
-            amount=event["transaction"]["amountCentavos"],
-        )
-
-    return jsonify(received=True)
-```
-
-```java Java
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.security.MessageDigest;
-import java.util.Map;
-
-@RestController
-public class NtxPayRefundOutHandler {
-    private static final byte[] SECRET =
-        System.getenv("NTXPAY_WEBHOOK_SECRET").getBytes();
-    private final ObjectMapper mapper = new ObjectMapper();
-
-    @PostMapping(value = "/webhooks/ntxpay", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> handle(
-        @RequestHeader("X-NTXPay-Signature") String sig,
-        @RequestBody byte[] raw
-    ) throws Exception {
-        String expected = "sha256=" + hmacSha256Hex(SECRET, raw);
-        if (!MessageDigest.isEqual(sig.getBytes(), expected.getBytes())) {
-            return ResponseEntity.status(401).build();
-        }
-
-        Map<String, Object> event = mapper.readValue(raw, new TypeReference<>() {});
-        if ("refund_out".equals(event.get("event"))) {
-            Map<String, Object> tx = (Map<String, Object>) event.get("transaction");
-            // Balance already debited
-            markOrderAsRefunded(
-                ((Number) event.get("originalTransactionId")).longValue(),
-                ((Number) tx.get("id")).longValue(),
-                ((Number) tx.get("amountCentavos")).longValue()
-            );
-        }
-
-        return ResponseEntity.ok(Map.of("received", true));
-    }
-
-    private static String hmacSha256Hex(byte[] secret, byte[] data) throws Exception {
-        Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(secret, "HmacSHA256"));
-        byte[] result = mac.doFinal(data);
-        StringBuilder sb = new StringBuilder(result.length * 2);
-        for (byte b : result) sb.append(String.format("%02x", b));
-        return sb.toString();
-    }
+```typescript
+const event = JSON.parse(rawBody.toString());
+if (event.event === 'transaction.cash_out.returned') {
+  // O crédito do saldo de volta já aconteceu automaticamente
+  await markPayoutReturned(event.transactionId, event.amount);
 }
 ```
 
-```go Go
-package main
-
-import (
-    "crypto/hmac"
-    "crypto/sha256"
-    "encoding/hex"
-    "encoding/json"
-    "io"
-    "net/http"
-    "os"
-)
-
-var secret = []byte(os.Getenv("NTXPAY_WEBHOOK_SECRET"))
-
-type refundOutEvent struct {
-    Event                 string `json:"event"`
-    OriginalTransactionID int64  `json:"originalTransactionId"`
-    Transaction           struct {
-        ID             int64 `json:"id"`
-        AmountCentavos int64 `json:"amountCentavos"`
-    } `json:"transaction"`
-}
-
-func handleRefundOut(w http.ResponseWriter, r *http.Request) {
-    raw, _ := io.ReadAll(r.Body)
-
-    sig := r.Header.Get("X-NTXPay-Signature")
-    h := hmac.New(sha256.New, secret)
-    h.Write(raw)
-    expected := "sha256=" + hex.EncodeToString(h.Sum(nil))
-
-    if !hmac.Equal([]byte(sig), []byte(expected)) {
-        w.WriteHeader(http.StatusUnauthorized)
-        return
-    }
-
-    var event refundOutEvent
-    if err := json.Unmarshal(raw, &event); err == nil && event.Event == "refund_out" {
-        // Balance already debited
-        markOrderAsRefunded(
-            event.OriginalTransactionID,
-            event.Transaction.ID,
-            event.Transaction.AmountCentavos,
-        )
-    }
-
-    _ = json.NewEncoder(w).Encode(map[string]bool{"received": true})
-}
-
-func main() {
-    http.HandleFunc("/webhooks/ntxpay", handleRefundOut)
-    _ = http.ListenAndServe(":8080", nil)
-}
-```
-
-</CodeGroup>
-
+Para o handler completo com validação HMAC e dedupe em Node.js, Python, Java e Go, veja [Implementação](/pt-br/guides/webhooks/implementation).
