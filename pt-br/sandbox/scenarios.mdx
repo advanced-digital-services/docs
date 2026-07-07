@@ -21,12 +21,12 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
 ```
 
 <Warning>
-  A maioria dos cenários controla o **webhook assíncrono**: a resposta HTTP é `201 Created` com `status: PENDING`, e o resultado final chega no webhook. As exceções são `timeout` e `provider_5xx`, que falham na resposta HTTP **síncrona**.
+  A maioria dos cenários controla o **webhook assíncrono**: a resposta HTTP é `201 Created` com `status: PENDING`, e o resultado final chega no webhook. As exceções são `timeout` e `service_unavailable`, que falham na resposta HTTP **síncrona**.
 </Warning>
 
 ## Cenários disponíveis
 
-Os valores canônicos de cenário são: `success`, `pending_long`, `rejected`, `returned`, `insufficient_funds`, `bad_clabe`, `timeout`, `provider_5xx`.
+Os valores canônicos de cenário são: `success`, `pending_long`, `rejected`, `returned`, `insufficient_funds`, `bad_clabe`, `timeout`, `service_unavailable`.
 
 ### Cenários de resultado assíncrono
 
@@ -52,7 +52,7 @@ Falham na própria resposta HTTP — nenhum webhook é enviado.
 | Header Value | Resposta síncrona |
 |---|---|
 | `timeout` | Timeout no processamento (`504`) após ~16s |
-| `provider_5xx` | Serviço temporariamente indisponível (`503`) |
+| `service_unavailable` | Serviço temporariamente indisponível (`503`) |
 
 <Info>
   **Restrições de cash-in:** `insufficient_funds` e `bad_clabe` não se aplicam a cash-in (não há saldo a debitar, e a CLABE de depósito é gerada pelo sistema). Enviar qualquer um deles em um cash-in retorna `400` com código `SCENARIO_NOT_APPLICABLE`.
