@@ -12,6 +12,7 @@ The `cash_in` webhook type receives the lifecycle events of a charge created via
 |---|---|---|
 | `transaction.cash_in.settled` | `LIQUIDATED` | The SPEI transfer arrived at the disposable CLABE and was settled |
 | `transaction.cash_in.rejected` | `REJECTED` | The SPEI network rejected the transfer |
+| `transaction.cash_in.expired` | `EXPIRED` | The CLABE expired (~24h) without receiving the transfer |
 | `transaction.cash_in.pending` | `PENDING` | Intermediate processing update |
 
 <Info>
