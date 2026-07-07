@@ -52,6 +52,10 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
   Amount in MXN centavos (minimum 1). E.g. `50000` = $500.00 MXN.
 </ParamField>
 
+<ParamField path="externalId" type="string">
+  Unique external identifier (up to 100 characters). Resending with the same `externalId` returns the existing transfer (server-side idempotency).
+</ParamField>
+
 <ParamField path="destinationClabe" type="string" required>
   Destination CLABE — **exactly 18 numeric digits** (regex: `^\d{18}$`).
 </ParamField>
@@ -65,7 +69,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
 </ParamField>
 
 <ParamField path="concept" type="string">
-  Concept shown on the beneficiary's statement (up to 255 characters).
+  Concept shown on the beneficiary's statement (up to **40 characters** — SPEI concepto limit).
 </ParamField>
 
 ## Balance Validation

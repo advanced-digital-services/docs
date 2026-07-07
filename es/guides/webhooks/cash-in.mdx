@@ -12,6 +12,7 @@ El webhook del tipo `cash_in` recibe los eventos del ciclo de vida de un cobro c
 |---|---|---|
 | `transaction.cash_in.settled` | `LIQUIDATED` | La transferencia SPEI llegó a la CLABE desechable y fue liquidada |
 | `transaction.cash_in.rejected` | `REJECTED` | La red SPEI rechazó la transferencia |
+| `transaction.cash_in.expired` | `EXPIRED` | La CLABE expiró (~24h) sin recibir la transferencia |
 | `transaction.cash_in.pending` | `PENDING` | Actualización intermedia de procesamiento |
 
 <Info>
