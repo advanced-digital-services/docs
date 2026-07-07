@@ -37,6 +37,7 @@ Todo webhook entrega el mismo formato de payload:
   "status": "LIQUIDATED",
   "destinationClabe": "012180001234567890",
   "sourceClabe": "646180123456789012",
+  "payerName": "Juan Perez",
   "reference": "1234567",
   "voucher": "CEP20260512A1B2C3",
   "occurredAt": "2026-05-12T14:31:05.000Z"
@@ -61,6 +62,10 @@ Todo webhook entrega el mismo formato de payload:
 
 <ResponseField name="destinationClabe / sourceClabe" type="string">
   CLABEs de destino y origen de la transferencia. Pueden venir `null` dependiendo del flujo.
+</ResponseField>
+
+<ResponseField name="payerName" type="string">
+  Nombre de quien pagó (cash-in), cuando la red lo informa. Puede venir `null`.
 </ResponseField>
 
 <ResponseField name="reference / voucher" type="string">
