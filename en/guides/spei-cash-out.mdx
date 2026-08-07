@@ -37,6 +37,7 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
 
 ```json
 {
+  "transactionId": "3f2a1c34-9d1e-4c7b-8a5e-2b6f0d9c4e71",
   "id": 56789,
   "status": "PENDING",
   "destinationClabe": "012180001234567890",
@@ -45,6 +46,8 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
   "createdAt": "2026-05-13T12:00:00.000Z"
 }
 ```
+
+The `transactionId` (UUID) is the official transaction identifier — it is the same value delivered in webhooks; use it to correlate events and look up the transaction. The numeric `id` field is **deprecated** and will be removed in the future.
 
 ## Request Fields
 

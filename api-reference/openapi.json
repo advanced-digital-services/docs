@@ -156,9 +156,17 @@
       "SpeiCashInOutputDto": {
         "type": "object",
         "properties": {
+          "transactionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Identificador publico da transacao (UUID). E o mesmo transactionId entregue nos webhooks — use-o para correlacionar e consultar a transacao.",
+            "example": "3f2a1c34-9d1e-4c7b-8a5e-2b6f0d9c4e71"
+          },
           "id": {
             "type": "integer",
-            "example": 12345
+            "example": 12345,
+            "deprecated": true,
+            "description": "ID numerico interno da transacao. DEPRECATED: use transactionId (UUID)."
           },
           "status": {
             "type": "string",
@@ -246,9 +254,17 @@
       "SpeiCashOutOutputDto": {
         "type": "object",
         "properties": {
+          "transactionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Identificador publico da transacao (UUID). E o mesmo transactionId entregue nos webhooks — use-o para correlacionar e consultar a transacao.",
+            "example": "3f2a1c34-9d1e-4c7b-8a5e-2b6f0d9c4e71"
+          },
           "id": {
             "type": "integer",
-            "example": 56789
+            "example": 56789,
+            "deprecated": true,
+            "description": "ID numerico interno da transacao. DEPRECATED: use transactionId (UUID)."
           },
           "status": {
             "type": "string",
