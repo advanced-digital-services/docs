@@ -100,8 +100,8 @@
         "properties": {
           "amountCentavos": {
             "type": "integer",
-            "minimum": 1,
-            "description": "Valor em centavos MXN (mín. 1).",
+            "minimum": 1000,
+            "description": "Amount in MXN centavos. Minimum 1000 centavos (10.00 MXN) — partner bank floor.",
             "example": 50000
           },
           "externalId": {
