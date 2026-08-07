@@ -38,7 +38,6 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
 ```json
 {
   "transactionId": "3f2a1c34-9d1e-4c7b-8a5e-2b6f0d9c4e71",
-  "id": 56789,
   "status": "PENDING",
   "destinationClabe": "012180001234567890",
   "amountCentavos": 50000,
@@ -47,7 +46,33 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-out \
 }
 ```
 
-O `transactionId` (UUID) é o identificador oficial da transação — é o mesmo valor entregue nos webhooks; use-o para correlacionar eventos e consultar a transação. O campo `id` numérico está **deprecated** e será removido futuramente.
+O `transactionId` (UUID) é o identificador único da transação — é o mesmo valor entregue nos webhooks; use-o para correlacionar eventos e consultar a transação.
+
+## Campos do Response
+
+<ResponseField name="transactionId" type="string" required>
+  Identificador único da transação (UUID). Mesmo valor entregue nos webhooks.
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Status da transação: `PENDING`, `CONFIRMED`, `FAILED` ou `EXPIRED`.
+</ResponseField>
+
+<ResponseField name="destinationClabe" type="string" required>
+  CLABE de destino que o pagador deve usar na transferência SPEI.
+</ResponseField>
+
+<ResponseField name="referenceNumerical" type="string">
+  Referência numérica SPEI, quando disponível.
+</ResponseField>
+
+<ResponseField name="amountCentavos" type="integer" required>
+  Valor em centavos MXN.
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  Criação da transação (ISO 8601).
+</ResponseField>
 
 ## Campos do Request
 
