@@ -99,7 +99,7 @@ O `transactionId` (UUID) é o identificador único da transação — é o mesmo
 ## Campos do Request
 
 <ParamField path="amountCentavos" type="integer" required>
-  Valor em centavos MXN (mínimo 1). Ex.: `50000` = $500,00 MXN.
+  Valor em centavos MXN. **Mínimo: `1000` centavos ($10,00 MXN)** — piso do banco parceiro; abaixo disso a API retorna `400` com code `CASHIN_MIN_AMOUNT`. Ex.: `50000` = $500,00 MXN.
 </ParamField>
 
 <ParamField path="externalId" type="string">
