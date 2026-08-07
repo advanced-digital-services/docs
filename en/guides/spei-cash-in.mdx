@@ -45,7 +45,6 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
 ```json
 {
   "transactionId": "3f2a1c34-9d1e-4c7b-8a5e-2b6f0d9c4e71",
-  "id": 12345,
   "status": "PENDING",
   "destinationClabe": "012180001234567890",
   "beneficiary": {
@@ -61,7 +60,41 @@ curl -X POST https://sandbox.mx.ntxpay.com/api/spei/cash-in \
 
 Display the `destinationClabe` (and/or the `checkoutUrl`) to the end payer.
 
-The `transactionId` (UUID) is the official transaction identifier — it is the same value delivered in webhooks; use it to correlate events and look up the transaction. The numeric `id` field is **deprecated** and will be removed in the future.
+The `transactionId` (UUID) is the unique transaction identifier — it is the same value delivered in webhooks; use it to correlate events and look up the transaction.
+
+## Response Fields
+
+<ResponseField name="transactionId" type="string" required>
+  Unique transaction identifier (UUID). Same value delivered in webhooks.
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Transaction status: `PENDING`, `CONFIRMED`, `FAILED` or `EXPIRED`.
+</ResponseField>
+
+<ResponseField name="destinationClabe" type="string" required>
+  Destination CLABE the payer must use for the SPEI transfer.
+</ResponseField>
+
+<ResponseField name="beneficiary" type="object" required>
+  Beneficiary shown to the payer (`name` and, when available, `taxId`).
+</ResponseField>
+
+<ResponseField name="referenceNumerical" type="string">
+  SPEI numeric reference, when available.
+</ResponseField>
+
+<ResponseField name="checkoutUrl" type="string">
+  Hosted checkout URL (alternative to a manual transfer), when available.
+</ResponseField>
+
+<ResponseField name="expiresAt" type="string" required>
+  Charge expiration (ISO 8601).
+</ResponseField>
+
+<ResponseField name="amountCentavos" type="integer" required>
+  Amount in MXN centavos.
+</ResponseField>
 
 ## Request Fields
 
